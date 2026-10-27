@@ -26,6 +26,7 @@ public struct RECT { public int Left, Top, Right, Bottom; }
 public struct POINT { public int X, Y; }
 [StructLayout(LayoutKind.Sequential)]
 public struct WINDOWPLACEMENT { public int length, flags, showCmd; public POINT minPos, maxPos; public RECT normalPos; }
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern bool SetWindowText(System.IntPtr hWnd, string text);
 [DllImport("user32.dll")] public static extern bool SetWindowPlacement(System.IntPtr hWnd, ref WINDOWPLACEMENT wp);
 [StructLayout(LayoutKind.Sequential)]
 public struct PROCESS_INFORMATION { public System.IntPtr hProcess, hThread; public int dwProcessId, dwThreadId; }
@@ -43,7 +44,8 @@ public static int Start(string exe, string args, string dir) {
     CloseHandle(pi.hThread); CloseHandle(pi.hProcess); return pi.dwProcessId;
 }
 // Minimized (not activated); restoring it puts it at the right edge of the primary screen, stacked from the top.
-public static void Park(System.IntPtr hWnd, int slot) {
+public static void Park(System.IntPtr hWnd, int slot, string title) {
+    SetWindowText(hWnd, title);
     int w = 496, h = 309, sw = GetSystemMetrics(0);
     WINDOWPLACEMENT wp = new WINDOWPLACEMENT(); wp.length = Marshal.SizeOf(typeof(WINDOWPLACEMENT));
     wp.showCmd = 7; wp.normalPos.Left = sw - w; wp.normalPos.Top = slot * h; wp.normalPos.Right = sw; wp.normalPos.Bottom = slot * h + h;
@@ -69,7 +71,7 @@ foreach ($lab in $labs) {
     $id = [RamLab.Win]::Start((Join-Path $dir 'RickAndMortyVR.exe'), "$window -logFile `"$log`" -rt-lab -rt-slot $slot $role", $dir)
     $p = Get-Process -Id $id
     $started += $p
-    for ($i = 0; $i -lt 150; $i++) { $p.Refresh(); if ($p.MainWindowHandle -ne [IntPtr]::Zero) { [RamLab.Win]::Park($p.MainWindowHandle, $slot); break }; Start-Sleep -Milliseconds 100 }
+    for ($i = 0; $i -lt 150; $i++) { $p.Refresh(); if ($p.MainWindowHandle -ne [IntPtr]::Zero) { [RamLab.Win]::Park($p.MainWindowHandle, $slot, "R&M lab - $($lab.Name)"); break }; Start-Sleep -Milliseconds 100 }
     $slot++
     if ($lab.Name -eq 'host') { Start-Sleep 4 }
 }
