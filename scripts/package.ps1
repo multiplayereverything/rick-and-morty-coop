@@ -1,5 +1,5 @@
-# Builds the release ZIP: BepInEx 5.4.23.5 (x64) with this mod's BepInEx.cfg, plus the plugin. No game files.
-# Unzip into the game folder, next to RickAndMortyVR.exe.
+# Builds the mod-only release ZIP: the plugin and the BepInEx.cfg this game needs. No loader, no game files.
+# BepInEx 5.4.23.5 comes from the repo's pinned loader release. Unzip both into the game folder, next to RickAndMortyVR.exe.
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $modRoot = Split-Path $PSScriptRoot -Parent
@@ -8,7 +8,7 @@ $out = Join-Path $modRoot 'artifacts/release'
 New-Item -ItemType Directory -Force $out | Out-Null
 $stage = Join-Path $modRoot 'private/package-stage'
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
-Copy-Item -Recurse (Join-Path $modRoot 'deps/BepInEx-5.4.23.5') $stage
+New-Item -ItemType Directory -Force $stage | Out-Null
 New-Item -ItemType Directory -Force (Join-Path $stage 'BepInEx/plugins/RickAndMortyTogether'), (Join-Path $stage 'BepInEx/config') | Out-Null
 Copy-Item (Join-Path $modRoot 'artifacts/BepInEx/RickAndMortyTogether.dll') (Join-Path $stage 'BepInEx/plugins/RickAndMortyTogether/')
 # Unity 5.4 needs BepInEx to start at the first scene load; this config sets that entrypoint.

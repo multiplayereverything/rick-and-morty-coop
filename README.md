@@ -10,15 +10,20 @@ buttons, levers and level changes are not shared yet: each player's game runs it
 
 ## Install
 
-1. Download `RickAndMortyTogether-BepInEx-<version>.zip` from the
-   [releases](https://github.com/multiplayereverything/rick-and-morty-coop/releases).
-2. Unzip it into the game folder, next to `RickAndMortyVR.exe`
-   (Steam: right-click the game > Manage > Browse local files).
-3. Start the game from Steam as usual.
+If the Multiplayer Everything launcher lists this mod, it installs both parts for you. By hand:
 
-The ZIP contains BepInEx 5.4.23.5 and its `BepInEx/config/BepInEx.cfg`. Keep that config: this game's Unity version
-needs BepInEx to start at the first scene load, and the default setting breaks the game's scenes. If you already use
-BepInEx for this game, merge the `[Preloader.Entrypoint]` section into your config.
+1. Open the game folder (Steam: right-click the game > Manage > Browse local files).
+2. Unzip `BepInEx_win_x64_5.4.23.5.zip` from the
+   [BepInEx 5.4.23.5 loader release](https://github.com/multiplayereverything/rick-and-morty-coop/releases/tag/bepinex-5.4.23.5)
+   there, next to `RickAndMortyVR.exe`.
+3. Unzip `RickAndMortyTogether-BepInEx-<version>.zip` from the
+   [releases](https://github.com/multiplayereverything/rick-and-morty-coop/releases) on top, and let it replace
+   `BepInEx/config/BepInEx.cfg`.
+4. Start the game from Steam as usual.
+
+Keep the mod's `BepInEx.cfg`: this game's Unity version needs BepInEx to start at the first scene load, and the
+default setting breaks the game's scenes. If you have your own BepInEx config for this game, copy its
+`[Preloader.Entrypoint]` section instead.
 
 To remove the mod, delete `winhttp.dll`, `doorstop_config.ini`, `.doorstop_version` and the `BepInEx` folder.
 
