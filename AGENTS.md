@@ -3,6 +3,22 @@
 Start with `handoff.md` (current state, next steps), `docs/RECON.md` (how the game works, the co-op plan) and
 `README.md` (behaviour, limits). Keep all of them current along with `MODLOG.md`.
 
+## How to work (Karpathy guidelines)
+
+The user asked for these on every change to this mod. They favour care over speed; for a one-line fix, use judgment.
+
+1. **Think before coding.** Write down your assumptions. When a request can be read two ways, name both. Say so when
+   a simpler approach exists. This project's sessions don't ask the user questions: pick the reading you can defend,
+   log it as a **Decision** in `MODLOG.md`, and say it in the report.
+2. **Simplicity first.** Write the least code that does what was asked. Nothing speculative: no extra features, no
+   settings nobody asked for, no abstraction with one caller, no handling for cases that can't happen. If 200 lines
+   could be 50, rewrite them.
+3. **Surgical changes.** Every changed line should trace to the request. Match the surrounding style. Don't reformat
+   or refactor code that works. Remove what your own change left unused; mention other dead code, don't delete it.
+4. **Goal-driven.** Turn each task into a check that can fail: a fix gets a lab tour check that reproduces the bug,
+   then passes, plus its `Mutant("x")` switch (see Rules). For multi-step work, write the plan as steps, each with its
+   check. "Done" means the check passed in the lab, with the evidence in `artifacts/tests/`.
+
 ## Layout
 | Path | What |
 | --- | --- |
