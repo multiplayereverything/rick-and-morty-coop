@@ -31,8 +31,8 @@ First vertical slice: two players see each other as Morty and pass an item hand 
 - **Headless lab.** `-vrmode None` plus three repairs (`LoadCore` platform query, play-space selector, first scene
   load) and the game's own debug hands; scripted head and hands rig; tours with RT-CHECK lines; RT-METRIC every 2 s
   (heap, objects, errors, mod ms, fps); RT-STATE on a shared host-time grid for desync.
-  - **Decision:** lab windows start minimized without activation, with a 480x270 restore position parked at the
-    right edge, BelowNormal priority, lowest quality, 30 fps (the user's lab rule from 2026-10-27).
+  - **Decision:** lab windows are normal titled windows ("R&M lab - host", "R&M lab - c1") that start minimized
+    without activation, with a 480x270 restore position parked at the right edge, set once at launch, BelowNormal priority, lowest quality, 30 fps (the user's lab rule from 2026-10-27).
 - **F5 panel.** Host on Steam (friends or public), host on LAN, find public Steam games, join by IP, player list with
   ping, invite friends, leave. Checked from in-game screenshots (`-rt-panel`).
 - **Tested** (`artifacts/tests/`):
