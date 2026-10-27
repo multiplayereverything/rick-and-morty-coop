@@ -90,13 +90,13 @@ the grab button. The lab rig (`src/Rig.cs`) moves the head camera and both track
 
 | System | Co-op model | Status |
 | --- | --- | --- |
-| Head and body pose | **Per-player**, streamed at 20 Hz; others draw a Morty avatar (the game's own clone head, a body following head position and yaw, Morty hands) | done (0.1.0) |
+| Head pose | **Per-player**, streamed at 20 Hz; others draw a floating Morty head (the game's own clone head) with Morty hands | done (0.1.0; head only since 0.3.0) |
 | Hands: pose, grip, held item | **Per-player**, in the same stream; remote hands open/close with the grip | done (0.1.0) |
 | Grabbable items (pickups, throws, hand-offs) | **Host-shared** with ownership: host grants every grab claim (last grab wins), bumps an epoch, the previous holder lets go; the owner simulates and streams, everyone else follows kinematically | done (0.1.0) |
-| Buttons, levers, hinges, sliders, pull cords, doors | **Host-shared** events: send the lock/press event, replay it with the game's own `Lock*/SetNormalizedAmount` | next |
+| Buttons, levers, hinges, sliders, pull cords, doors | **Host-shared**: levers/doors/sliders use item ownership and stream axis + lock state, followers driven with the game's own `Lock*/SetNormalizedAmount`; buttons and cords are events replayed by the host. Per-player: height and spectator levers | done (0.2.0) |
 | Spawned items (combinator, respawners, Youseeks, laundry) | **Host-shared**: the host spawns and announces prefab + id; clients' own spawns are suppressed and replaced | next |
-| Story (progression stage, Brain world events, VO, Rick's cinematics) | **Host-shared**: Brain runs on the host; clients replay the host's world-event keys and stage changes, their own Brain inputs become requests | next |
-| Level transitions (DVD -> garage, mission scene activation, portals) | **Host-shared**: host announces; clients follow with the game's own `FadeAndLoadScene` / scene activation and teleport to the host's zone | next |
+| Story (progression stage, Brain world events, VO, Rick's cinematics) | **Host-shared**: the host's Brain decides; its cause keys are replayed on clients, clients' causes become requests; stage by asset name; Brain dice seeded identically | done (0.3.0) |
+| Level transitions (DVD -> garage, mission scene activation, portals) | **Host-shared**: announced as the host's fade starts; clients follow with `FadeAndLoadScene`, own loads held back; garage areas mirrored; teleport to the host's zone when the client's area goes off | done (0.3.0) |
 | Death and respawn | **Per-player** death scene, host-shared respawn rules | later |
 | NPC look-at, enemy aim, player zones | **Host-shared** with retargeting to the nearest player | later |
 | Saves | **Host only** saves; a client's own save is never touched | done (0.1.0) |

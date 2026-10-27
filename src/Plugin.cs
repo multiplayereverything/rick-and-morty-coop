@@ -16,8 +16,14 @@ namespace RickAndMortyTogether
         {
             BepInEx.Logging.ManualLogSource log = Logger;
             TogetherRuntime.Log = message => log.LogInfo(message);
-            try { new Harmony("com.multiplayereverything.rickandmortytogether").PatchAll(typeof(Plugin).Assembly); }
-            catch (Exception ex) { log.LogError("Harmony patches failed: " + ex); }
+            // One class at a time: a patch that fails (say the game changed) must not take every later patch with it.
+            Harmony harmony = new Harmony("com.multiplayereverything.rickandmortytogether");
+            foreach (Type type in typeof(Plugin).Assembly.GetTypes())
+            {
+                if (type.GetCustomAttributes(typeof(HarmonyPatch), false).Length == 0) continue;
+                try { harmony.CreateClassProcessor(type).Patch(); }
+                catch (Exception ex) { log.LogError("Harmony patch " + type.Name + " failed: " + ex); TogetherRuntime.PatchFailures.Add(type.Name + ": " + ex.Message); }
+            }
             TogetherRuntime.Create(Path.GetDirectoryName(Application.dataPath));
         }
     }

@@ -18,7 +18,10 @@ foreach ($name in $names) {
     }
     $data = Join-Path $dir 'RickAndMortyVR_Data'
     if (!(Test-Path $data)) { New-Item -ItemType Junction -Path $data -Target (Join-Path $game 'RickAndMortyVR_Data') | Out-Null }
-    Copy-Item -Force (Join-Path $bep 'winhttp.dll'), (Join-Path $bep 'doorstop_config.ini'), (Join-Path $bep '.doorstop_version') $dir
+    # Only what is missing: a rerun must not trip over a loader file a running copy has open.
+    foreach ($file in 'winhttp.dll', 'doorstop_config.ini', '.doorstop_version') {
+        if (!(Test-Path (Join-Path $dir $file))) { Copy-Item (Join-Path $bep $file) $dir }
+    }
     New-Item -ItemType Directory -Force (Join-Path $dir 'BepInEx/core'), (Join-Path $dir 'BepInEx/plugins/RickAndMortyTogether'), (Join-Path $dir 'BepInEx/config') | Out-Null
     Copy-Item -Force (Join-Path $bep 'BepInEx/core/*') (Join-Path $dir 'BepInEx/core')
     # The release's config: entrypoint at the first scene load, no console window (it would take focus).

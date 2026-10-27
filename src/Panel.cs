@@ -100,7 +100,7 @@ namespace RickAndMortyTogether
             if (!Active && transport == null) DrawStart();
             else DrawSession();
             GUILayout.Space(8);
-            GUILayout.Label("F5 closes this panel. Up to 4 players; the host's game is the shared one.", dimStyle);
+            GUILayout.Label("F5 closes this panel. Two players: the host's game is the shared one.", dimStyle);
             GUI.DragWindow(new Rect(0, 0, 10000, 30));
         }
 

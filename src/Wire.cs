@@ -4,12 +4,12 @@ using UnityEngine;
 
 namespace RickAndMortyTogether
 {
-    public enum Op : byte { Hello = 1, Welcome, Reject, Roster, Leave, Ping, Pong, Pose, Scene, ItemClaim, ItemOwner, ItemState }
+    public enum Op : byte { Hello = 1, Welcome, Reject, Roster, Leave, Ping, Pong, Pose, Scene, ItemClaim, ItemOwner, ItemState, ControlState, TriggerFired, Cause, Stage, Area, Areas }
 
     public static class Wire
     {
         // Bump on every protocol change; a joiner with another version is refused with both versions in the message.
-        public const int Version = 1;
+        public const int Version = 4;
 
         public static byte[] Packet(Op op, Action<BinaryWriter> write)
         {
@@ -78,8 +78,26 @@ namespace RickAndMortyTogether
         public Vector3 HeadPosition;
         public Quaternion HeadRotation;
         public HandPose Left, Right;
+        // Spectator mode: whether this player is spectating, and where their spectator camera floats when it is out in
+        // the world (not riding on their head).
+        public bool Spectating, CameraShown;
+        public Vector3 CameraPosition;
+        public Quaternion CameraRotation;
 
-        public void Write(BinaryWriter w) { Wire.Text(w, Scene); Wire.Vec(w, HeadPosition); Wire.Rot(w, HeadRotation); Left.Write(w); Right.Write(w); }
-        public static PlayerPose Read(BinaryReader r) { PlayerPose p; p.Scene = Wire.Text(r, 64); p.HeadPosition = Wire.Vec(r); p.HeadRotation = Wire.Rot(r); p.Left = HandPose.Read(r); p.Right = HandPose.Read(r); return p; }
+        public void Write(BinaryWriter w)
+        {
+            Wire.Text(w, Scene); Wire.Vec(w, HeadPosition); Wire.Rot(w, HeadRotation); Left.Write(w); Right.Write(w);
+            w.Write((byte)((Spectating ? 1 : 0) | (CameraShown ? 2 : 0)));
+            if (CameraShown) { Wire.Vec(w, CameraPosition); Wire.Rot(w, CameraRotation); }
+        }
+        public static PlayerPose Read(BinaryReader r)
+        {
+            PlayerPose p = new PlayerPose();
+            p.Scene = Wire.Text(r, 64); p.HeadPosition = Wire.Vec(r); p.HeadRotation = Wire.Rot(r); p.Left = HandPose.Read(r); p.Right = HandPose.Read(r);
+            byte flags = r.ReadByte();
+            p.Spectating = (flags & 1) != 0; p.CameraShown = (flags & 2) != 0;
+            if (p.CameraShown) { p.CameraPosition = Wire.Vec(r); p.CameraRotation = Wire.Rot(r); }
+            return p;
+        }
     }
 }

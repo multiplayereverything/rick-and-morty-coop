@@ -75,9 +75,9 @@ namespace RickAndMortyTogether
                     if (!Hosting) continue;
                     id = 1;
                     while (steamLinks.ContainsKey(id)) id++;
-                    if (id > 3)
+                    if (id > MaxPlayers - 1)
                     {
-                        byte[] reject = Wire.Packet(Op.Reject, w => Wire.Text(w, "The game is full (4 players)."));
+                        byte[] reject = Wire.Packet(Op.Reject, w => Wire.Text(w, FullMessage));
                         SteamNetworking.SendP2PPacket(from, reject, (uint)reject.Length, EP2PSend.k_EP2PSendReliable, SteamChannel);
                         continue;
                     }

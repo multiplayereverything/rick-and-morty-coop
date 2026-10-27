@@ -62,7 +62,7 @@ namespace RickAndMortyTogether
             // Steam's lobby search lists public lobbies only; a lab run finds its own host by a run tag.
             if (steamLabTag.Length > 0) PublicLobby = true;
             Status = "Creating a Steam lobby";
-            lobbyCreated.Set(SteamMatchmaking.CreateLobby(PublicLobby ? ELobbyType.k_ELobbyTypePublic : ELobbyType.k_ELobbyTypeFriendsOnly, 4));
+            lobbyCreated.Set(SteamMatchmaking.CreateLobby(PublicLobby ? ELobbyType.k_ELobbyTypePublic : ELobbyType.k_ELobbyTypeFriendsOnly, Transport.MaxPlayers));
         }
 
         void OnLobbyCreated(LobbyCreated_t result, bool failed)

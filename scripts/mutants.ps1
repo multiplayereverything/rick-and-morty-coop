@@ -7,6 +7,13 @@ $mutants = [ordered]@{
     'nohandoff' = 'handoff'   # the previous holder keeps holding when someone takes the item
     'noclaim'   = 'handoff'   # a client's grab is never sent to the host
     'nofollow'  = 'handoff'   # non-owners keep simulating their own copy instead of following the owner
+    'nocontrol' = 'controls'  # levers and doors ignore the owner's position and lock state
+    'nobutton'  = 'controls'  # a button pushed here is never sent to the other players
+    'nocause'   = 'story'     # story events are neither sent by the host nor held back on clients
+    'nospectatorview' = 'spectator'  # cycling spectator cameras never visits the other players' views
+    'nostage'   = 'story'     # clients ignore the host's progression stage
+    'noarea'    = 'story'     # clients do not mirror the host's garage areas
+    'noscenefollow' = 'story' # clients neither follow the host's scene loads nor hold their own back
 }
 $results = @()
 foreach ($m in $mutants.Keys) {

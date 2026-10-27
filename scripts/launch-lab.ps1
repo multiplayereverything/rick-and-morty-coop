@@ -56,7 +56,7 @@ public static void Park(System.IntPtr hWnd, int slot, string title) {
 
 $logs = Join-Path $modRoot 'private/lab-logs'
 New-Item -ItemType Directory -Force $logs | Out-Null
-Get-ChildItem $logs -Filter '*.log' -ErrorAction SilentlyContinue | Remove-Item -Force
+Get-ChildItem $logs -Filter '*.log' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 # -vrmode None: no OpenVR device, so no SteamVR and no headset; the mod's lab rig drives head and hands.
 $window = '-vrmode None -screen-fullscreen 0 -screen-width 480 -screen-height 270 -screen-quality Fastest'
 $started = @()

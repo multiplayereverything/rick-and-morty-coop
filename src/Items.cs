@@ -24,6 +24,11 @@ namespace RickAndMortyTogether
         public bool HasTarget;
         public float LastSend, RestSince = -1, LastMoved;
         public bool SentRest;
+        // Levers, doors, drawers and sliders: synced as their position along the axis plus lock state, not a pose.
+        public LimitedIndirectGrabbableController Control;
+        public float TargetAmount, LastAmount = -1;
+        public byte TargetLock, LastLock;
+        public bool HasControlTarget, QuietControl;
     }
 
     // Host-authoritative item ownership. The host starts as owner of every item. Grabbing an item claims it; the
@@ -42,6 +47,7 @@ namespace RickAndMortyTogether
         {
             foreach (NetItem item in items.Values) StopFollowing(item);
             items.Clear(); itemOf.Clear(); itemScene = ""; nextItemScan = 0;
+            triggers.Clear(); triggerOf.Clear(); FollowingControls.Clear();
         }
 
         public NetItem ItemById(uint id) { NetItem item; return items.TryGetValue(id, out item) ? item : null; }
@@ -67,23 +73,28 @@ namespace RickAndMortyTogether
         void ScanItems()
         {
             string scene = SceneManager.GetActiveScene().name;
-            if (scene != itemScene) { foreach (NetItem old in items.Values) StopFollowing(old); items.Clear(); itemOf.Clear(); itemScene = scene; }
+            if (scene != itemScene) { foreach (NetItem old in items.Values) StopFollowing(old); items.Clear(); itemOf.Clear(); triggers.Clear(); triggerOf.Clear(); FollowingControls.Clear(); itemScene = scene; }
             int added = 0;
             foreach (GrabbableItem grab in UnityEngine.Object.FindObjectsOfType<GrabbableItem>())
             {
                 if (itemOf.ContainsKey(grab)) continue;
                 Rigidbody body = grab.GetComponent<Rigidbody>();
-                if (body == null) continue;
+                LimitedIndirectGrabbableController control = grab.GetComponent<LimitedIndirectGrabbableController>();
+                if (body == null && control == null) continue;
+                // Each player's own spectator camera is theirs (it travels in their pose, see Spectator.cs).
+                if (grab.GetComponentInParent<SpectatorCameraController>() != null) continue;
                 string key = KeyOf(grab.transform);
+                if (control != null && PerPlayerControl(key)) continue;
                 uint id = Hash(key);
                 if (items.ContainsKey(id)) continue;   // a duplicate path (an unnamed runtime clone) stays local for now
-                NetItem item = new NetItem { Id = id, Key = key, Grab = grab, Body = body, Owner = 0, OriginalKinematic = body.isKinematic };
+                NetItem item = new NetItem { Id = id, Key = key, Grab = grab, Body = body, Control = control, Owner = 0, OriginalKinematic = body != null && body.isKinematic };
                 items[id] = item; itemOf[grab] = item;
                 added++;
                 // On a client every item starts as a follower of the host's copy, so local bumps cannot drift it.
                 if (!Hosting && !Mutant("nofollow")) StartFollowing(item);
             }
             if (added > 0) Log("Items: " + added + " new in " + scene + " (" + items.Count + " synced)");
+            ScanTriggers();
             HookHands();
         }
 
@@ -103,17 +114,24 @@ namespace RickAndMortyTogether
 
         void StartFollowing(NetItem item)
         {
-            if (item.Following || item.Body == null) return;
+            if (item.Following) return;
+            if (item.Body == null && item.Control == null) return;
             item.Following = true;
-            item.Body.isKinematic = true;
+            if (item.Control != null) FollowingControls.Add(item.Control);
+            if (item.Body != null) item.Body.isKinematic = true;
         }
 
-        void StopFollowing(NetItem item)
+        // grabbedHere: a hand on this copy just took it, so the game's own grab handler has already set up its body.
+        void StopFollowing(NetItem item, bool grabbedHere = false)
         {
+            if (item.Control != null) FollowingControls.Remove(item.Control);
+            item.HasControlTarget = false;
             if (!item.Following || item.Body == null) { item.Following = false; return; }
             item.Following = false;
             item.HasTarget = false;
-            item.Body.isKinematic = item.OriginalKinematic;
+            // A lever or door grabbed here was just made non-kinematic by the game's own grab handler (some doors are
+            // kinematic whenever no hand holds them): keep it so.
+            item.Body.isKinematic = item.OriginalKinematic && !(item.Control != null && (grabbedHere || (item.Grab != null && item.Grab.IsCurrInHand)));
         }
 
         // A local hand grabbed something: claim it.
@@ -125,7 +143,7 @@ namespace RickAndMortyTogether
             if (Hosting) { GrantItem(item, 0); return; }
             // Optimistic: simulate it at once so the hand carries it; the host's answer confirms or hands it on.
             item.Owner = LocalId;
-            StopFollowing(item);
+            StopFollowing(item, true);
             item.SentRest = false;
             if (!Mutant("noclaim")) Send(0, Wire.Packet(Op.ItemClaim, w => { w.Write(item.Id); w.Write(item.Epoch); }));
             Log("Claimed " + grab.name);
@@ -185,7 +203,7 @@ namespace RickAndMortyTogether
             {
                 NetItem it = item;
                 Send(to, Wire.Packet(Op.ItemOwner, w => { w.Write(it.Id); w.Write(it.Epoch); w.Write((byte)it.Owner); }));
-                if (it.Owner == 0) Send(to, StatePacket(it, true));
+                if (it.Owner == 0 && (it.Body != null || it.Control != null)) Send(to, StatePacket(it, true));
             }
         }
 
@@ -197,31 +215,37 @@ namespace RickAndMortyTogether
 
         byte[] StatePacket(NetItem item, bool rest)
         {
+            if (item.Control != null) return ControlStatePacket(item, rest);
             Transform t = item.Body.transform;
             Vector3 velocity = item.Body.isKinematic ? Vector3.zero : item.Body.velocity;
             return Wire.Packet(Op.ItemState, w => { w.Write(item.Id); w.Write(item.Epoch); w.Write(rest); Wire.Vec(w, t.position); Wire.Rot(w, t.rotation); Wire.Vec(w, velocity); });
         }
 
-        void HostItemState(int from, BinaryReader r)
+        void HostItemState(int from, BinaryReader r) { HostState(from, r, Op.ItemState); }
+
+        // Owner and epoch checked, applied here, relayed to everyone else unchanged.
+        void HostState(int from, BinaryReader r, Op op)
         {
             long start = r.BaseStream.Position;
             uint id = r.ReadUInt32(); ushort epoch = r.ReadUInt16();
             NetItem item;
             if (!items.TryGetValue(id, out item) || item.Owner != from || item.Epoch != epoch) return;   // stale or not theirs
             r.BaseStream.Position = start;
-            ApplyState(item, r);
-            byte[] relay = Wire.Packet(Op.ItemState, w => { r.BaseStream.Position = start; w.Write(r.ReadBytes((int)(r.BaseStream.Length - start))); });
+            if (op == Op.ControlState) ApplyControlState(item, r); else ApplyState(item, r);
+            byte[] relay = Wire.Packet(op, w => { r.BaseStream.Position = start; w.Write(r.ReadBytes((int)(r.BaseStream.Length - start))); });
             Broadcast(relay, from);
         }
 
-        void ClientItemState(BinaryReader r)
+        void ClientItemState(BinaryReader r) { ClientState(r, Op.ItemState); }
+
+        void ClientState(BinaryReader r, Op op)
         {
             long start = r.BaseStream.Position;
             uint id = r.ReadUInt32(); ushort epoch = r.ReadUInt16();
             NetItem item;
             if (!items.TryGetValue(id, out item) || item.Owner == LocalId || epoch < item.Epoch) return;
             r.BaseStream.Position = start;
-            ApplyState(item, r);
+            if (op == Op.ControlState) ApplyControlState(item, r); else ApplyState(item, r);
         }
 
         void ApplyState(NetItem item, BinaryReader r)
@@ -242,7 +266,9 @@ namespace RickAndMortyTogether
             float k = 1f - Mathf.Exp(-Time.deltaTime * 20f);
             foreach (NetItem item in items.Values)
             {
-                if (item.Grab == null || item.Body == null) continue;
+                if (item.Grab == null) continue;
+                if (item.Control != null) { ControlUpdate(item, now, k); continue; }
+                if (item.Body == null) continue;
                 if (item.Owner != LocalId)
                 {
                     if (item.Following && item.HasTarget)

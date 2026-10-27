@@ -20,6 +20,9 @@ namespace RickAndMortyTogether
     public sealed partial class Transport : IDisposable
     {
         public const int MaxFrame = 65536;
+        // The host plus one other player (the user's call: the game is built around one Morty and Rick's attention).
+        public const int MaxPlayers = 2;
+        public static readonly string FullMessage = "The game is full (" + MaxPlayers + " players).";   // process-scoped (a constant)
         // Lab only: simulated one-way delay and jitter on every send, to test desync on slow links.
         public static int LagMs, JitterMs;   // lab-only
         readonly Queue<NetworkEvent> events = new Queue<NetworkEvent>();
@@ -65,7 +68,7 @@ namespace RickAndMortyTogether
             try
             {
                 client.SendTimeout = 2000;
-                byte[] packet = Wire.Packet(Op.Reject, w => Wire.Text(w, "The game is full (4 players)."));
+                byte[] packet = Wire.Packet(Op.Reject, w => Wire.Text(w, FullMessage));
                 byte[] header = { (byte)packet.Length, (byte)(packet.Length >> 8), (byte)(packet.Length >> 16), (byte)(packet.Length >> 24) };
                 NetworkStream stream = client.GetStream();
                 stream.Write(header, 0, 4); stream.Write(packet, 0, packet.Length);
@@ -129,7 +132,7 @@ namespace RickAndMortyTogether
                 int id = 1;
                 while (links.ContainsKey(id)) id++;
                 if (disposed) { client.Close(); return; }
-                if (id > 3) full = true;
+                if (id > MaxPlayers - 1) full = true;
                 else
                 {
                     try { Attach(id, client); }

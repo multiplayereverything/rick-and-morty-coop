@@ -10,6 +10,22 @@ $tours = @{
         'handoff.host.grabbed@host', 'handoff.host.carried@host', 'handoff.host.released@host', 'handoff.host.sees.carry@host', 'handoff.host.grip@host', 'handoff.host.rest@host',
         'handoff.client.sees.host@c1', 'handoff.client.grip@c1', 'handoff.client.followed@c1', 'handoff.client.grabbed@c1', 'handoff.client.owner@c1', 'handoff.client.carried@c1', 'handoff.client.rest@c1',
         'tour.done') }
+    'controls' = @{ Seconds = 240; Expect = @(
+        'net.host.started@host', 'net.peer.accepted@host', 'net.welcome@c1',
+        'controls.host.grabbed@host', 'controls.host.opened@host', 'controls.host.sees.door@host', 'controls.host.button@host', 'controls.host.closed@host',
+        'controls.client.sees.door@c1', 'controls.client.grabbed@c1', 'controls.client.opened@c1', 'controls.client.button@c1', 'controls.client.sees.lock@c1',
+        'tour.done') }
+    'story' = @{ Seconds = 420; Expect = @(
+        'net.host.started@host', 'net.peer.accepted@host', 'net.welcome@c1',
+        'story.host.cause@host', 'story.host.request@host', 'story.host.stage@host', 'story.host.garage@host', 'story.host.area@host', 'story.host.sees.client@host', 'story.host.back@host',
+        'story.client.cause@c1', 'story.client.held@c1', 'story.client.request@c1', 'story.client.stage@c1', 'story.client.garage@c1', 'story.client.areas@c1', 'story.client.blocked@c1', 'story.client.back@c1',
+        'tour.done') }
+    'spectator' = @{ Seconds = 200; Expect = @(
+        'spectator.host.on@host', 'spectator.host.camera@host', 'spectator.host.watch@host', 'spectator.host.back@host',
+        'spectator.client.sees.on@c1', 'spectator.client.sees.camera@c1', 'spectator.client.sees.off@c1', 'tour.done') }
+    'full' = @{ Seconds = 120; Expect = @('net.welcome@c1', 'net.rejected@c2', 'full.host.one@host', 'tour.done@host') }
+    'portrait' = @{ Seconds = 120; Expect = @('avatar.morty', 'portrait.saved', 'tour.done') }
+    'survey' = @{ Seconds = 90; Expect = @('tour.done@host') }
 }
 if (!$tours.ContainsKey($Tour)) { throw "Unknown tour $Tour" }
 $labRoot = Join-Path $modRoot 'private'
@@ -39,7 +55,22 @@ if ($Steam) {
     $name += '-steam'
 }
 $out = Join-Path $modRoot "artifacts/tests/$name-results.json"
-& (Join-Path $PSScriptRoot 'launch-lab.ps1') -Players $Players -HostArgs $hostArgs -ClientArgs $clientArgs -Tour $Tour -JoinAddress $joinAddress
+# Other mods' labs share this PC; under that load a copy now and then hangs before its first scene (its Unity log
+# stops after "Input initialized", before the mod loads). Such a start is retried once, and the output says so.
+$labDirs = @('lab-host', 'lab-c1', 'lab-c2', 'lab-c3')[0..($Players - 1)]
+for ($attempt = 1; $attempt -le 2; $attempt++) {
+    & (Join-Path $PSScriptRoot 'launch-lab.ps1') -Players $Players -HostArgs $hostArgs -ClientArgs $clientArgs -Tour $Tour -JoinAddress $joinAddress
+    $started = $false
+    for ($i = 0; $i -lt 90; $i++) {
+        Start-Sleep 1
+        if (@($labDirs | Where-Object { -not (Test-Path (Join-Path $labRoot "$_/rick-and-morty-together-lab.log")) }).Count -eq 0) { $started = $true; break }
+    }
+    if ($started -or $attempt -eq 2) { break }
+    Write-Output 'a lab copy hung at startup (no mod log after 90 s): restarting the copies once'
+    foreach ($id in (Get-Content (Join-Path $labRoot 'lab-pids.txt') | ForEach-Object { [int]$_ })) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue; Wait-Process -Id $id -Timeout 15 -ErrorAction SilentlyContinue }
+    foreach ($d in $labDirs) { Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $labRoot "$d/rick-and-morty-together-lab.log") }
+    Start-Sleep 3
+}
 $deadline = (Get-Date).AddSeconds($Seconds)
 $probe = Join-Path $labRoot 'tour-probe.json'
 $probeArgs = @((Join-Path $modRoot 'tests/verify-lab.py'), $modRoot, '--out', $probe)

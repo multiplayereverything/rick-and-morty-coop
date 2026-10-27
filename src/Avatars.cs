@@ -5,14 +5,16 @@ using UnityEngine;
 namespace RickAndMortyTogether
 {
     // A remote player drawn as Morty: the game's own Morty-clone head (HeadControllerRAM's CloneHeadDynamic, the
-    // model the game puts on the player for mirrors and the spectator camera), a Morty body under it that follows the
-    // head's position and yaw, and two Morty hands (copies of the player's own MortyHand) that open and close with
+    // model the game puts on the player for mirrors and the spectator camera) and two Morty hands (copies of the player's own MortyHand) that open and close with
     // the remote grip. Copies are made inside an inactive parent and stripped of every game script, collider and
     // rigidbody before they are switched on, so no game code ever runs on them.
     public sealed class Avatar
     {
         public readonly GameObject Root;
-        public readonly Transform Head, Body, LeftHand, RightHand;
+        public readonly Transform Head, LeftHand, RightHand;
+        // This player's spectator camera, when it is out in the world (made on first use).
+        public Transform Camera;
+        bool headHidden;
         readonly Animator leftAnimator, rightAnimator;
         bool leftClosed, rightClosed;
         public float LeftGrip, RightGrip;
@@ -26,8 +28,6 @@ namespace RickAndMortyTogether
             MasterHMDAndInputController m = TogetherRuntime.Master;
             Head = MakeHead(m);
             Head.SetParent(Root.transform, false);
-            Body = MakeBody();
-            Body.SetParent(Root.transform, false);
             LeftHand = MakeHand(m, Handedness.Left, out leftAnimator);
             RightHand = MakeHand(m, Handedness.Right, out rightAnimator);
             LeftHand.SetParent(Root.transform, false);
@@ -42,7 +42,7 @@ namespace RickAndMortyTogether
         public void SetName(string name) { if (label != null && label.text != name) label.text = name; }
 
         // Copies a live object without letting its scripts wake: instantiate under an inactive parent, strip, then move out.
-        static GameObject Inert(GameObject source)
+        public static GameObject Inert(GameObject source)
         {
             GameObject holder = new GameObject("RickAndMortyTogether Copy");
             holder.SetActive(false);
@@ -80,19 +80,6 @@ namespace RickAndMortyTogether
             return p.transform;
         }
 
-        // Morty's yellow shirt and blue trousers, hanging from the neck; the shoulders turn with the head's yaw.
-        static Transform MakeBody()
-        {
-            GameObject body = new GameObject("Body");
-            GameObject shirt = Shape(PrimitiveType.Capsule, new Color(0.98f, 0.86f, 0.18f));
-            shirt.transform.SetParent(body.transform, false);
-            shirt.transform.localPosition = new Vector3(0, -0.45f, 0); shirt.transform.localScale = new Vector3(0.36f, 0.3f, 0.24f);
-            GameObject trousers = Shape(PrimitiveType.Capsule, new Color(0.17f, 0.36f, 0.72f));
-            trousers.transform.SetParent(body.transform, false);
-            trousers.transform.localPosition = new Vector3(0, -1.0f, 0); trousers.transform.localScale = new Vector3(0.3f, 0.36f, 0.22f);
-            return body.transform;
-        }
-
         Transform MakeHand(MasterHMDAndInputController m, Handedness side, out Animator animator)
         {
             animator = null;
@@ -128,18 +115,43 @@ namespace RickAndMortyTogether
         }
 
         // Smoothly toward the latest pose (20 Hz stream); snaps after a teleport.
-        bool placed;
+        bool placed, cameraPlaced;
+
+        // Hidden while a spectator watches through this player's eyes (the head would fill the view).
+        public void SetHeadHidden(bool hidden)
+        {
+            if (headHidden == hidden) return;
+            headHidden = hidden;
+            foreach (Renderer r in Head.GetComponentsInChildren<Renderer>(true)) r.enabled = !hidden;
+        }
+        public bool HeadHidden { get { return headHidden; } }
+
+        // Shown again after being in another scene: the next pose places it outright.
+        public void Unplace() { placed = false; cameraPlaced = false; }
 
         public void Follow(PlayerPose pose, float dt)
         {
-            float k = placed ? 1f - Mathf.Exp(-dt * 18f) : 1f;
+            // A jump of more than half a metre is a teleport or a scene change, not movement: snap, don't glide.
+            bool jump = (Head.position - pose.HeadPosition).sqrMagnitude > 0.25f;
+            float k = placed && !jump ? 1f - Mathf.Exp(-dt * 18f) : 1f;
             placed = true;
             Move(Head, pose.HeadPosition, pose.HeadRotation, k);
-            Vector3 forward = pose.HeadRotation * Vector3.forward; forward.y = 0;
-            Quaternion yaw = forward.sqrMagnitude > 0.001f ? Quaternion.LookRotation(forward) : Body.rotation;
-            Move(Body, pose.HeadPosition, yaw, k * 0.6f);
             Move(LeftHand, pose.Left.Position, pose.Left.Rotation, k);
             Move(RightHand, pose.Right.Position, pose.Right.Rotation, k);
+            if (pose.CameraShown && Camera == null) Camera = TogetherRuntime.MakeSpectatorCameraCopy(Root.transform);
+            if (Camera != null)
+            {
+                if (Camera.gameObject.activeSelf != pose.CameraShown) { Camera.gameObject.SetActive(pose.CameraShown); cameraPlaced = false; }
+                if (pose.CameraShown) { Move(Camera, pose.CameraPosition, pose.CameraRotation, cameraPlaced ? k : 1f); cameraPlaced = true; }
+            }
+            // The name reads the right way round from wherever this player looks at it (it would follow the head's turn
+            // otherwise, and read mirrored from the front).
+            MasterHMDAndInputController m = TogetherRuntime.Master;
+            if (label != null && m != null && m.HMDCamera != null)
+            {
+                Vector3 away = label.transform.position - m.HMDCamera.transform.position;
+                if (away.sqrMagnitude > 0.0001f) label.transform.rotation = Quaternion.LookRotation(away, Vector3.up);
+            }
             LeftGrip = pose.Left.Grip; RightGrip = pose.Right.Grip;
             SetClosed(leftAnimator, ref leftClosed, pose.Left.Grip > 0.5f);
             SetClosed(rightAnimator, ref rightClosed, pose.Right.Grip > 0.5f);
@@ -178,7 +190,7 @@ namespace RickAndMortyTogether
                 p.Avatar.SetName(p.Name);
                 // Someone in another scene of the game is not drawn here.
                 bool here = p.Pose.Scene == scene;
-                if (p.Avatar.Root.activeSelf != here) p.Avatar.Root.SetActive(here);
+                if (p.Avatar.Root.activeSelf != here) { p.Avatar.Root.SetActive(here); if (here) p.Avatar.Unplace(); }
                 if (here) p.Avatar.Follow(p.Pose, dt);
             }
         }

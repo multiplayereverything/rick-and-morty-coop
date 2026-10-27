@@ -7,7 +7,11 @@ Checks:
   * managed heap does not trend upward; the mod's own root objects stay within their bound
   * the mod's frame cost stays within budget (median modms)
   * desync: RT-STATE samples are taken on a shared host-time grid; every item and avatar seen by two copies at the
-    same grid tick is compared. Resting items must agree within 5 cm; moving ones within 50 cm.
+    same grid tick is compared. Resting items must agree within 5 cm; moving ones within 50 cm. Levers, doors and
+    sliders at rest must agree within 2% of their travel and have the same lock state.
+  * NPCs: every dialogue and animation Brain effect (RT-FX lines from the Voice, Animation and cinematic modules) that
+    one copy runs while another copy is in the same scene must run there too, within 3 s. Effects in a copy's first
+    12 s in a scene are not compared: each copy runs a scene's opening effects when it loads the scene.
 
 Usage: python -I verify-lab.py <mod root> [--expect name[@role] ...] [--out results.json]
 """
@@ -21,13 +25,24 @@ LABS = {"host": "lab-host", "c1": "lab-c1", "c2": "lab-c2", "c3": "lab-c3"}
 METRIC = re.compile(r"RT-METRIC (.*)")
 CHECK = re.compile(r"RT-CHECK (\S+) (PASS|FAIL) ?(.*)")
 STATE = re.compile(r"RT-STATE (.*)")
+FX = re.compile(r"RT-FX ht=(\S+) scene=(\S+) fx=(\S+)")
+NPC_MODULES = ("BrainControlledModule_Voice.", "BrainControlledModule_Animation.", "BrainControlledModule_RickCinematicEvent.", "BrainControlledModule_InterruptAllCharacters.")
+FX_WINDOW = 3.0
+SCENE_SETTLE = 12.0   # a copy that just loaded a scene runs that scene's opening effects itself; compare after that
 REST_LIMIT, MOVING_LIMIT = 0.05, 0.5
+CONTROL_REST_LIMIT = 0.02
+GRID_SLACK = 0.15   # seconds a state sample may sit off its 2 s grid moment and still be compared
 MODMS_BUDGET, HEAP_SLOPE_BUDGET, ERROR_SLOPE_BUDGET = 2.0, 1.5, 0.5
 
 
 def parse(path):
-    metrics, checks, moderrors, states = [], [], [], []
+    metrics, checks, moderrors, states, fx = [], [], [], [], []
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        f = FX.search(line)
+        if f:
+            if any(m in f.group(3) for m in NPC_MODULES):
+                fx.append((float(f.group(1)), f.group(2), f.group(3)))
+            continue
         m = METRIC.search(line)
         if m:
             metrics.append(dict(kv.split("=", 1) for kv in m.group(1).split() if "=" in kv))
@@ -41,7 +56,7 @@ def parse(path):
             checks.append((c.group(1), c.group(2) == "PASS", c.group(3)))
         if "RT-MODERROR" in line:
             moderrors.append(line.strip()[:400])
-    return metrics, checks, moderrors, states
+    return metrics, checks, moderrors, states, fx
 
 
 def slope(values):
@@ -64,14 +79,30 @@ def dist(a, b):
 def grid_states(states):
     """Grid tick (host time rounded to the 2 s grid) -> {entity: (position, info)} for one copy."""
     out = {}
+    last_scene = None
     for s in states:
-        tick = round(float(s.get("ht", 0)) / 2.0)
+        ht = float(s.get("ht", 0))
+        # The first sample after this copy changed scene can catch a player on the frame the game spawned them,
+        # before they moved to their spot: one 50 ms pose, not a desync. Skip it.
+        scene = s.get("scene", "")
+        changed = last_scene is not None and scene != last_scene
+        last_scene = scene
+        if changed:
+            continue
+        tick = round(ht / 2.0)
+        # A sample taken well after its grid moment (a scene load stalled that frame) is not the same moment as the
+        # other copies' samples for that tick: leave it out rather than compare two different instants.
+        if abs(ht - tick * 2.0) > GRID_SLACK:
+            continue
         me = s.get("id", "?")
         entry = out.setdefault(tick, {})
         for key, value in s.items():
             if key.startswith("item"):
                 pos, _, owner, epoch, mode = value.split("|")
                 entry[key] = (vec(pos), mode, owner, epoch)
+            elif key.startswith("ctl"):
+                amount, locks, owner, epoch, mode = value.split("|")
+                entry[key] = ([float(amount)], mode, owner, locks)
             elif key in ("self.head", "self.R"):
                 entry["player" + me + key[4:]] = (vec(value), "self", "", "")
             elif key.startswith("av") and (key.endswith(".head") or key.endswith(".R")):
@@ -92,12 +123,14 @@ def main():
             out = args[i + 1]; i += 2
         else:
             i += 1
-    results, failures, grids = {}, [], {}
+    results, failures, grids, effects, scenes = {}, [], {}, {}, {}
     for role, folder in LABS.items():
         path = root / "private" / folder / "rick-and-morty-together-lab.log"
         if not path.exists():
             continue
-        metrics, checks, moderrors, states = parse(path)
+        metrics, checks, moderrors, states, fx = parse(path)
+        effects[role] = fx
+        scenes[role] = [(float(s.get("ht", 0)), s.get("scene", "")) for s in states]
         info = {"checks": [{"name": n, "pass": p, "detail": d} for n, p, d in checks], "moderrors": moderrors[:5]}
         for n, p, d in checks:
             if not p:
@@ -137,7 +170,7 @@ def main():
     if not results:
         failures.append("no lab logs found")
     # Desync between every pair of copies at the same grid tick.
-    desync = {"rest_max": 0.0, "moving_max": 0.0, "pairs": 0, "rest_pairs": 0, "worst": ""}
+    desync = {"rest_max": 0.0, "moving_max": 0.0, "pairs": 0, "rest_pairs": 0, "control_rest_max": 0.0, "control_rest_pairs": 0, "worst": ""}
     roles = list(grids)
     for a in range(len(roles)):
         for b in range(a + 1, len(roles)):
@@ -146,6 +179,17 @@ def main():
                 for key in set(ga[tick]) & set(gb[tick]):
                     pa, ma = ga[tick][key][0], ga[tick][key][1]
                     pb, mb = gb[tick][key][0], gb[tick][key][1]
+                    if key.startswith("ctl"):
+                        # Only settled controls are compared: travel within 2% and the same lock bits.
+                        if sorted((ma, mb)) != ["follow", "rest"]:
+                            continue
+                        d = abs(pa[0] - pb[0])
+                        desync["control_rest_pairs"] += 1
+                        desync["control_rest_max"] = max(desync["control_rest_max"], round(d, 4))
+                        la, lb = ga[tick][key][3], gb[tick][key][3]
+                        if d > CONTROL_REST_LIMIT or la != lb:
+                            desync["worst"] = f"{key} at tick {tick}: {roles[a]} {pa[0]} locks {la} vs {roles[b]} {pb[0]} locks {lb}"
+                        continue
                     d = dist(pa, pb)
                     desync["pairs"] += 1
                     resting = key.startswith("item") and sorted((ma, mb)) == ["follow", "rest"]
@@ -158,6 +202,31 @@ def main():
     desync["rest_max"], desync["moving_max"] = round(desync["rest_max"], 4), round(desync["moving_max"], 4)
     if desync["worst"]:
         failures.append("desync over budget: " + desync["worst"])
+    # NPC dialogue and animation: the same effects on every copy that shares the scene.
+    npc = {"pairs": 0, "missing": 0, "first_missing": ""}
+
+    def in_scene(role, t, scene):
+        near = [s for ht, s in scenes.get(role, []) if t - SCENE_SETTLE <= ht <= t + FX_WINDOW + 2]
+        return len(near) >= 3 and all(s == scene for s in near)
+
+    for a in effects:
+        for b in effects:
+            if a == b:
+                continue
+            pool = list(effects[b])
+            for t, scene, name in effects[a]:
+                if not (in_scene(a, t, scene) and in_scene(b, t, scene)):
+                    continue
+                match = next((x for x in pool if x[2] == name and abs(x[0] - t) <= FX_WINDOW), None)
+                if match:
+                    pool.remove(match)
+                    npc["pairs"] += 1
+                else:
+                    npc["missing"] += 1
+                    npc["first_missing"] = npc["first_missing"] or f"{name} at {t:.1f} in {scene} on {a}, not on {b}"
+    desync["npc"] = npc
+    if npc["missing"]:
+        failures.append(f"NPC effects differ: {npc['missing']} missing, first: {npc['first_missing']}")
     for spec in expects:
         name, _, where = spec.partition("@")
         if where == "anyclient":

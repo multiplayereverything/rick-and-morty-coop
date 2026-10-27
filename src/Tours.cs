@@ -18,7 +18,13 @@ namespace RickAndMortyTogether
             if (tourStarted || labTour.Length == 0) return;
             if (SceneManager.GetActiveScene().name != "LivingRoom" || Master == null || !RigActive) return;
             tourStarted = true;
-            if (labTour == "handoff") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? HandoffHost() : HandoffClient());
+            if (labTour == "survey") StartCoroutine(Survey());
+            else if (labTour == "portrait") StartCoroutine(Portrait());
+            else if (labTour == "full") StartCoroutine(FullGame());
+            else if (labTour == "spectator") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? SpectatorHost() : SpectatorClient());
+            else if (labTour == "story") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? StoryHost() : StoryClient());
+            else if (labTour == "controls") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? ControlsHost() : ControlsClient());
+            else if (labTour == "handoff") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? HandoffHost() : HandoffClient());
             else Log("Unknown tour " + labTour);
         }
 

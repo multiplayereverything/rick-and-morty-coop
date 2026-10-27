@@ -59,6 +59,7 @@ namespace RickAndMortyTogether
             pose.HeadPosition = head.position; pose.HeadRotation = head.rotation;
             pose.Left = CaptureHand(LocalHand(Handedness.Left));
             pose.Right = CaptureHand(LocalHand(Handedness.Right));
+            CaptureSpectator(ref pose);
             return true;
         }
 

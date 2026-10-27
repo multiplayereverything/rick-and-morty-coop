@@ -40,6 +40,7 @@ namespace RickAndMortyTogether
                 labLog = new StreamWriter(Path.Combine(Root, "rick-and-morty-together-lab.log"), false) { AutoFlush = true };
                 Action<string> previous = Log;
                 Log = message => { previous(message); WriteLab(message); };
+                foreach (string failure in PatchFailures) { Interlocked.Increment(ref modErrorCount); WriteLab("RT-MODERROR patch " + failure); }
                 if (mutants.Count > 0) Log("Lab: fixes turned off: " + string.Join(",", new List<string>(mutants).ToArray()));
             }
             catch (Exception ex) { Log("Lab log unavailable: " + ex.Message); }
@@ -105,16 +106,24 @@ namespace RickAndMortyTogether
             }
             // State samples on a shared host-time grid, so the verifier can pair the same moment across copies.
             float ht = HostTime;
-            if (Active && ht >= nextState)
+            // A client's host clock is only right after its first ping round-trip; samples before that are skipped.
+            if (Active && (Hosting || lastRtt >= 0) && ht >= nextState)
             {
                 nextState = (Mathf.Floor(ht / 2f) + 1) * 2f;
-                StringBuilder s = new StringBuilder("RT-STATE ht=" + ht.ToString("0.000") + " id=" + LocalId);
+                StringBuilder s = new StringBuilder("RT-STATE ht=" + ht.ToString("0.000") + " id=" + LocalId + " scene=" + SceneManager.GetActiveScene().name);
                 PlayerPose me;
                 if (CaptureLocalPose(out me)) s.Append(" self.head=" + V(me.HeadPosition) + " self.L=" + V(me.Left.Position) + " self.R=" + V(me.Right.Position) + " self.Rgrip=" + me.Right.Grip.ToString("0.00"));
-                foreach (Peer p in peers.Values) if (p.Avatar != null) s.Append(" av" + p.Id + ".head=" + V(p.Avatar.Head.position) + " av" + p.Id + ".R=" + V(p.Avatar.RightHand.position) + " av" + p.Id + ".Rclosed=" + (p.Avatar.AnimatorClosed(Handedness.Right) ? 1 : 0));
+                // Only avatars drawn here (same scene): one in another scene is hidden and not a desync.
+                foreach (Peer p in peers.Values) if (p.Avatar != null && p.Avatar.Root.activeSelf) s.Append(" av" + p.Id + ".head=" + V(p.Avatar.Head.position) + " av" + p.Id + ".R=" + V(p.Avatar.RightHand.position) + " av" + p.Id + ".Rclosed=" + (p.Avatar.AnimatorClosed(Handedness.Right) ? 1 : 0));
                 foreach (NetItem item in items.Values)
                 {
-                    if (item.Body == null || (item.LastMoved <= 0 && !labWatched.Contains(item.Id))) continue;
+                    if (item.LastMoved <= 0 && !labWatched.Contains(item.Id)) continue;
+                    if (item.Control != null)
+                    {
+                        s.Append(" ctl" + item.Id.ToString("x8") + "=" + Mathf.Clamp01(item.Control.NormalizedAxisValue).ToString("0.0000") + "|" + LockBits(item.Control) + "|o" + item.Owner + "|e" + item.Epoch + "|" + ItemMode(item));
+                        continue;
+                    }
+                    if (item.Body == null) continue;
                     s.Append(" item" + item.Id.ToString("x8") + "=" + V(item.Body.transform.position) + "|" + Q(item.Body.transform.rotation) + "|o" + item.Owner + "|e" + item.Epoch + "|" + ItemMode(item));
                 }
                 Log(s.ToString());

@@ -22,7 +22,7 @@ namespace RickAndMortyTogether
     // (later) story; every player owns their own head and hands.
     public sealed partial class TogetherRuntime : MonoBehaviour
     {
-        public const string ModVersion = "0.1.0";
+        public const string ModVersion = "0.4.0";
         public static TogetherRuntime Instance;   // process-scoped
         public static Action<string> Log = delegate { };   // process-scoped
         public static string Root = "";   // process-scoped
@@ -47,6 +47,8 @@ namespace RickAndMortyTogether
         float bestRtt = float.MaxValue;
         public float HostTime { get { return Hosting || LocalId <= 0 ? Time.realtimeSinceStartup : Time.realtimeSinceStartup + HostClockOffset; } }
         public string HostScene = "";
+        // Harmony patch classes that failed to apply at load (each one is logged; the lab counts them as mod errors).
+        public static readonly List<string> PatchFailures = new List<string>();   // process-scoped
 
         public static void Create(string root)
         {
@@ -131,6 +133,8 @@ namespace RickAndMortyTogether
             LocalId = -1;
             HostClockOffset = 0; bestRtt = float.MaxValue;
             ResetItems();
+            ResetStory();
+            StopWatching();
             Status = "Not connected";
             Log("Network stopped: " + why);
         }
@@ -153,8 +157,10 @@ namespace RickAndMortyTogether
                     if (now >= nextPing) { nextPing = now + 1f; if (!Hosting) Send(0, Wire.Packet(Op.Ping, w => w.Write(now))); }
                     if (Hosting && now >= nextScene) { nextScene = now + 5f; BroadcastScene(); }
                     ItemsUpdate();
+                    StoryUpdate(now);
                 }
                 AvatarsUpdate();
+                SpectatorUpdate();
                 RigUpdate();
             }
             catch (Exception ex) { Log("ST-MODERROR update: " + ex); }
@@ -225,6 +231,7 @@ namespace RickAndMortyTogether
                 BroadcastRoster();
                 BroadcastScene();
                 SendItemSnapshot(from);
+                BroadcastAreas();
                 Log("Accepted " + peer.Name + " as player " + (from + 1));
                 Check("net.peer.accepted", true, peer.Name);
                 return;
@@ -245,6 +252,9 @@ namespace RickAndMortyTogether
                     }
                 case Op.ItemClaim: HostItemClaim(from, r); return;
                 case Op.ItemState: HostItemState(from, r); return;
+                case Op.ControlState: HostState(from, r, Op.ControlState); return;
+                case Op.TriggerFired: HostTriggerFired(from, r); return;
+                case Op.Cause: HostCause(from, r); return;
                 default: throw new IOException("op " + op + " is not accepted from clients");
             }
         }
@@ -304,6 +314,12 @@ namespace RickAndMortyTogether
                 case Op.Scene: { HostScene = Wire.Text(r, 64); return; }
                 case Op.ItemOwner: ClientItemOwner(r); return;
                 case Op.ItemState: ClientItemState(r); return;
+                case Op.ControlState: ClientState(r, Op.ControlState); return;
+                case Op.TriggerFired: ClientTriggerFired(r); return;
+                case Op.Cause: ClientCause(r); return;
+                case Op.Stage: ClientStage(r); return;
+                case Op.Area: ClientArea(r); return;
+                case Op.Areas: ClientAreas(r); return;
                 default: throw new IOException("op " + op + " is not expected from the host");
             }
         }
@@ -339,7 +355,7 @@ namespace RickAndMortyTogether
 
         void BroadcastScene()
         {
-            string scene = SceneManager.GetActiveScene().name;
+            string scene = HostSceneNow();
             byte[] packet = Wire.Packet(Op.Scene, w => Wire.Text(w, scene));
             foreach (Peer p in peers.Values) if (p.Accepted) Send(p.Id, packet);
         }

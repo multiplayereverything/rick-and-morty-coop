@@ -20,13 +20,19 @@ Start with `handoff.md` (current state, next steps), `docs/RECON.md` (how the ga
 | BepInEx entrypoint `SceneManager.Internal_SceneLoaded` | Start after Unity has bound the game's scripts (child domain on 5.4). |
 | `InteractionHandController.OnGrabSuccess` / `OnReleasedGrabbable` (events, per local hand) | Grab claims and release tracking (`src/Items.cs`). |
 | `InteractionHandController.TryRelease(false)` | The previous holder lets go when the host gives the item to someone else. |
+| `LimitedIndirectGrabbableController` lock/unlock/`SetNormalizedAmount`, Harmony prefixes on its `LateUpdate`/`FixedUpdate` (`src/Controls.cs`) | Levers, doors and sliders: followers driven by the owner's stream. |
+| `PushableButton.OnButtonPushed`, `PullCordController.OnPullCordPulled`; replay via the button's private `LockUpper/LockLower(bool)` | Buttons and cords fire on every copy. |
+| `BrainManager.CheckCauseLookupDictionaryForAction(string)` and `(string, float)` (Harmony prefixes, `src/Story.cs`) | Story causes: host broadcasts, clients request. |
+| `ProgressionManager.SetStage`, `SceneController.BeginDelayedActivation/Deactivation`, `GlobalStorage.FadeAndLoadScene` | Stage, garage areas and scene loads follow the host. |
+| `BrainNodeStatusController.Execute`, `BrainControlledModule_Voice.DoInterruptLogicAndGetInterruptClip`, `BrainControlledModule_Core.WaitForRandomAmountOfTime` (`src/Npcs.cs`) | Seeded dice: the same NPC line on every copy. |
+| `SpectatorModeLogic.CycleTarget` (prefix/postfix), `FindAndSetTarget` (postfix), `ExternalCameraController.SetTarget` (`src/Spectator.cs`) | Spectator cycle visits other players' eyes. |
 | `SaveLoad.Save` / `SaveLoad.Load` (Harmony prefixes, `src/Patches.cs`) | Lab never touches the shared save; clients don't save. |
 | `OwlchemyVRStorage.LoadCore`, `PlaySpaceSizeSelector`, `MasterHMDAndInputController.DebugModeEnabled` (reflection, `src/Headless.cs`) | Headless boot for the lab, only when no VR device is active. |
 | `Debug_TrackedInputController.isGrabbing`, `HandController.TrackedTransform`, HMD camera transform (`src/Rig.cs`) | Lab rig: scripted head, hands and grab. |
 
 ## Networking
 - **Wire:** `src/Wire.cs` (`Op`, `Wire.Version`), handlers in `TogetherRuntime.HostPacket` / `ClientPacket`
-  (`src/Runtime.cs`). The host accepts only `Hello, Leave, Ping, Pose, ItemClaim, ItemState` from clients.
+  (`src/Runtime.cs`). The host accepts only `Hello, Leave, Ping, Pose, ItemClaim, ItemState, ControlState, TriggerFired, Cause` from clients.
 - **LAN / direct:** `src/Transport.cs`, TCP 27040, keepalives from the writer thread.
 - **Online:** `src/SteamLobby.cs` (lobbies, invites, `+connect_lobby`), `src/SteamNet.cs` (`ISteamNetworking` P2P,
   channel 7). The game's Steamworks.NET has no Steam Networking Sockets.
