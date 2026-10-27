@@ -63,6 +63,13 @@ namespace RickAndMortyTogether
 
         static bool LocalCause(string key) { foreach (string p in LocalCausePrefixes) if (key.StartsWith(p, StringComparison.Ordinal)) return true; return false; }
 
+        // Death is one player's own: the Death area, the death scene's story (the death phone, the revive) and the
+        // DEATH / RESPAWN events. A dead player's story events stay on their own copy; the others play on.
+        static readonly string[] PerPlayerAreas = { "Death" };   // process-scoped (a constant)
+        static bool PerPlayerArea(string name) { return Array.IndexOf(PerPlayerAreas, name) >= 0 && !Mutant("nodeathlocal"); }
+        public static bool LocalPlayerDead { get { return DeathController.Instance != null && DeathController.Instance.PlayerIsDead && !Mutant("nodeathlocal"); } }
+        static bool DeathCause(string key) { return (key == "DEATH" || key == "RESPAWN") && !Mutant("nodeathlocal"); }
+
         static bool KnownCause(string key)
         {
             BrainManager brain = BrainManager.no_instantiate_instance;
@@ -72,7 +79,7 @@ namespace RickAndMortyTogether
         // Harmony prefix on BrainManager.CheckCauseLookupDictionaryForAction: false = this copy does not run it.
         public bool OnCause(string key, bool hasAmount, float amount)
         {
-            if (!Active || ReplayingCause || LocalCause(key) || Mutant("nocause")) return true;
+            if (!Active || ReplayingCause || LocalCause(key) || DeathCause(key) || LocalPlayerDead || Mutant("nocause")) return true;
             if (Hosting)
             {
                 if (!KnownCause(key)) return true;
@@ -195,6 +202,7 @@ namespace RickAndMortyTogether
         {
             if (!Active || !Hosting || area == null) return;
             string name = area.SceneName;
+            if (PerPlayerArea(name)) return;
             Broadcast(Wire.Packet(Op.Area, w => { Wire.Text(w, name); w.Write(on); }), -1);
             Log("Area " + name + (on ? " on" : " off"));
         }
@@ -202,6 +210,7 @@ namespace RickAndMortyTogether
         void BroadcastAreas()
         {
             List<string> on = ActiveAreas();
+            on.RemoveAll(PerPlayerArea);
             TeleportationController tc = GlobalStorage.no_instantiate_instance != null ? GlobalStorage.no_instantiate_instance.TeleportationController : null;
             string zone = tc != null && tc.CurrentZone != null && tc.CurrentZone.UniqueObjectData != null ? tc.CurrentZone.UniqueObjectData.name : "";
             string stage = CurrentStageName();
@@ -229,7 +238,9 @@ namespace RickAndMortyTogether
             hostAreas.Clear();
             for (int i = 0; i < count; i++) hostAreas.Add(Wire.Text(r, 128));
             hostAreasKnown = true;
-            if (stage.Length > 0 && stage != hostStage) { hostStage = stage; ApplyHostStage(); }
+            // Applied whenever this copy's stage differs, not only when the host's changed: loading the garage reloads
+            // the stage from this copy's own save (a fresh one for a guest), which puts it back to the first stage.
+            if (stage.Length > 0 && (stage != hostStage || !Mutant("nostagerepair"))) { hostStage = stage; ApplyHostStage(); }
             ReconcileAreas();
         }
 
@@ -247,8 +258,8 @@ namespace RickAndMortyTogether
         {
             if (!hostAreasKnown || SceneManager.GetActiveScene().name != HostScene) return;
             List<string> mine = ActiveAreas();
-            foreach (string name in hostAreas) if (!mine.Contains(name)) SwitchArea(name, true);
-            foreach (string name in mine) if (!hostAreas.Contains(name)) SwitchArea(name, false);
+            foreach (string name in hostAreas) if (!mine.Contains(name) && !PerPlayerArea(name)) SwitchArea(name, true);
+            foreach (string name in mine) if (!hostAreas.Contains(name) && !PerPlayerArea(name)) SwitchArea(name, false);
             FollowHostZone();
         }
 
@@ -257,13 +268,14 @@ namespace RickAndMortyTogether
         {
             GlobalStorage g = GlobalStorage.no_instantiate_instance;
             TeleportationController tc = g != null ? g.TeleportationController : null;
-            if (tc == null || tc.IsTeleporting || hostZone.Length == 0) return;
+            if (tc == null || tc.IsTeleporting || hostZone.Length == 0 || LocalPlayerDead) return;
             TeleportZone here = tc.CurrentZone;
             if (here != null && hostAreas.Contains(here.gameObject.scene.name)) return;
             if (here != null && here.UniqueObjectData != null && here.UniqueObjectData.name == hostZone) return;
             foreach (TeleportZone zone in UnityEngine.Object.FindObjectsOfType<TeleportZone>())
             {
                 if (zone.UniqueObjectData == null || zone.UniqueObjectData.name != hostZone) continue;
+                if (PerPlayerArea(zone.gameObject.scene.name)) return;   // the host is dead: don't follow into its death
                 tc.Teleport(zone, false, true, true, true);
                 Log("Teleported to the host's zone " + hostZone);
                 return;
@@ -314,7 +326,9 @@ namespace RickAndMortyTogether
             if (followingLoad && here == HostScene) { followingLoad = false; Log("Followed the host into " + here); }
             if (HostScene.Length == 0 || here == HostScene || here == "Loading" || Mutant("noscenefollow")) return;
             GlobalStorage g = GlobalStorage.no_instantiate_instance;
-            if (!followingLoad && g != null)
+            // Only from a scene that has finished starting (a copy still starting up has no teleport system yet, and
+            // the game's scene-change cleanup fails on it).
+            if (!followingLoad && g != null && g.TeleportationController != null && Master != null)
             {
                 followingLoad = true; followLoadAt = now;
                 Log("Following the host into " + HostScene);

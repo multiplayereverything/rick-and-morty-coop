@@ -192,4 +192,10 @@ namespace RickAndMortyTogether
             Log("Despawned " + item.Key);
         }
     }
+
+    [HarmonyLib.HarmonyPatch(typeof(GrabbableItem), "Start")]
+    static class GrabbableStartPatch
+    {
+        static void Postfix(GrabbableItem __instance) { if (TogetherRuntime.Instance != null && TogetherRuntime.Instance.Active) TogetherRuntime.Started.Add(__instance); }
+    }
 }

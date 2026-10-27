@@ -4,7 +4,7 @@ Co-op for **Rick and Morty: Virtual Rick-ality** (Steam, VR). Two players share 
 clones in the same garage, see each other's head and hands, and can pick things up, throw them and pass them from
 hand to hand.
 
-**Status: 0.5.0 pre-release.** Players, hands, grabbable items, doors, levers, sliders, buttons, the story, level
+**Status: 0.6.0 pre-release.** Players, hands, grabbable items, doors, levers, sliders, buttons, the story, level
 changes, and Rick's and Morty's lines and animations are shared, with the host's game in charge (see
 [What is shared](#what-is-shared)). Things the game makes or destroys while you play are shared too.
 
@@ -73,6 +73,9 @@ Remove the launch option to play in VR again.
 | Story | Yes | The host's game decides what happened; anything you do that moves the story is sent to the host and happens for everyone. |
 | Rick's and Morty's lines and animations | Yes | Same line at the same moment for everyone, including the game's random choices. |
 | Spectator mode | Yes | If someone's spectator camera is out in the room, everyone sees it there. "Cycle cameras" also lets your desktop window watch through each other player's eyes. |
+| Enemies | Yes | The host's game runs them; both players see the same enemies at the same places, either player can shoot them, and they shoot at whoever is nearest. |
+| Final boss | Yes | One boss fight for both; when it fires its death beam, both players die and come back. |
+| Dying | Your own | You go to your own death scene and come back; the other player plays on. |
 | Things the game makes or destroys | Yes | Machine results, dispenser drops and the like exist once, in the host's game, for both players; something eaten or smashed goes for both. |
 | Saves | Host only | A player in someone else's game keeps their own save untouched. |
 

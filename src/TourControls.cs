@@ -137,15 +137,20 @@ namespace RickAndMortyTogether
             while (Time.realtimeSinceStartup < shutBy && !(Amount(left) < 0.05f && (LockBits(left.Control) & 10) != 0)) yield return null;
             if (!(Amount(left) < 0.05f))
             {
-                Log("Left door stayed open (" + Amount(left).ToString("0.00") + ", locks " + LockBits(left.Control) + "): closing it by hand");
-                yield return StartCoroutine(GrabControl(Handedness.Left, left, "controls.host.closed"));
-                if (tourFailure != null) yield break;
-                yield return StartCoroutine(Swing(Handedness.Left, left, false, 0.02f, "controls.host.closed"));
-                if (tourFailure != null) yield break;
-                yield return StartCoroutine(Pause(1));
-                RigGrab(Handedness.Left, false);
-                yield return StartCoroutine(Pause(1));
-                RigSetHand(Handedness.Left, new Vector3(-0.6f, 1.1f, -0.3f));
+                // A hand can slip off a swinging door; like a player, take hold again (three tries).
+                for (int attempt = 1; attempt <= 3 && Amount(left) > 0.05f; attempt++)
+                {
+                    Log("Left door open (" + Amount(left).ToString("0.00") + ", locks " + LockBits(left.Control) + "): closing it by hand, try " + attempt);
+                    tourFailure = null;
+                    yield return StartCoroutine(GrabControl(Handedness.Left, left, "~controls.host.closed"));
+                    if (tourFailure == null) yield return StartCoroutine(Swing(Handedness.Left, left, false, 0.02f, "~controls.host.closed"));
+                    yield return StartCoroutine(Pause(1));
+                    RigGrab(Handedness.Left, false);
+                    yield return StartCoroutine(Pause(1));
+                    RigSetHand(Handedness.Left, new Vector3(-0.6f, 1.1f, -0.3f));
+                    yield return StartCoroutine(Pause(1));
+                }
+                tourFailure = null;
             }
             yield return StartCoroutine(Wait(() => Amount(left) < 0.05f && (LockBits(left.Control) & 10) != 0, 60, "controls.host.closed", () => "left door at " + Amount(left).ToString("0.00") + ", locks " + LockBits(left.Control)));
             if (tourFailure != null) yield break;

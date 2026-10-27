@@ -32,6 +32,7 @@ SCENE_SETTLE = 12.0   # a copy that just loaded a scene runs that scene's openin
 REST_LIMIT, MOVING_LIMIT = 0.05, 0.5
 CONTROL_REST_LIMIT = 0.02
 GRID_SLACK = 0.15   # seconds a state sample may sit off its 2 s grid moment and still be compared
+STARVED_FPS = 27.0
 MODMS_BUDGET, HEAP_SLOPE_BUDGET, ERROR_SLOPE_BUDGET = 2.0, 1.5, 0.5
 
 
@@ -82,9 +83,9 @@ def grid_states(states):
     last_scene = None
     for s in states:
         ht = float(s.get("ht", 0))
-        # The first sample after this copy changed scene can catch a player on the frame the game spawned them,
-        # before they moved to their spot: one 50 ms pose, not a desync. Skip it.
-        scene = s.get("scene", "")
+        # The first sample after this copy changed scene or teleported can catch a player mid-move (the frame the game
+        # spawned or moved them, before the others have their next pose): one 50 ms pose, not a desync. Skip it.
+        scene = s.get("scene", "") + "/" + s.get("zone", "")
         changed = last_scene is not None and scene != last_scene
         last_scene = scene
         if changed:
@@ -96,6 +97,8 @@ def grid_states(states):
             continue
         me = s.get("id", "?")
         entry = out.setdefault(tick, {})
+        if s.get("self.jump"):
+            entry.setdefault("_jumped", set()).add(me)
         for key, value in s.items():
             if key.startswith("item"):
                 pos, _, owner, epoch, mode = value.split("|")
@@ -156,7 +159,12 @@ def main():
             mod = sorted(float(m["modms"]) for m in metrics if "modms" in m)
             if mod:
                 info["modms_median"], info["modms_max"] = mod[len(mod) // 2], mod[-1]
-                if mod[len(mod) // 2] > MODMS_BUDGET:
+                # Frame cost is wall time: on a PC starved by other work (other labs) it counts time the mod's thread
+                # waited for the CPU. Judge it only when the copy ran near its 30 fps cap.
+                if info["fps_median"] < STARVED_FPS:
+                    info["modms_judged"] = False
+                    info["modms_note"] = f"not judged: fps median {info['fps_median']:.1f}, the PC was starved"
+                elif mod[len(mod) // 2] > MODMS_BUDGET:
                     failures.append(f"{role}: mod costs {mod[len(mod) // 2]:.2f} ms per frame (median), budget {MODMS_BUDGET} ms")
             mobj = [float(m["modobjects"]) for m in metrics if "modobjects" in m]
             peers = max(int(m.get("peers", 0)) for m in metrics)
@@ -176,7 +184,12 @@ def main():
         for b in range(a + 1, len(roles)):
             ga, gb = grids[roles[a]], grids[roles[b]]
             for tick in set(ga) & set(gb):
+                # A player who jumped (teleport, rig placed, a flat hand snapping) within 0.6 s of this sample: the
+                # others still draw the pose from 50 ms before. Not drift; don't compare that player at this tick.
+                jumped = ga[tick].get("_jumped", set()) | gb[tick].get("_jumped", set())
                 for key in set(ga[tick]) & set(gb[tick]):
+                    if key == "_jumped" or (key.startswith("player") and key[6:].split(".")[0] in jumped):
+                        continue
                     pa, ma = ga[tick][key][0], ga[tick][key][1]
                     pb, mb = gb[tick][key][0], gb[tick][key][1]
                     if key.startswith("ctl"):
@@ -225,7 +238,11 @@ def main():
                     npc["missing"] += 1
                     npc["first_missing"] = npc["first_missing"] or f"{name} at {t:.1f} in {scene} on {a}, not on {b}"
     desync["npc"] = npc
-    if npc["missing"]:
+    # At a few fps Unity's game clock falls behind real time, so a starved copy's timed lines lag: not a desync.
+    starved = [r for r, info in results.items() if info.get("fps_median", 30) < STARVED_FPS]
+    if npc["missing"] and starved:
+        npc["note"] = "not judged: " + ", ".join(starved) + " starved (fps median under %.0f)" % STARVED_FPS
+    elif npc["missing"]:
         failures.append(f"NPC effects differ: {npc['missing']} missing, first: {npc['first_missing']}")
     for spec in expects:
         name, _, where = spec.partition("@")

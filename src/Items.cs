@@ -47,7 +47,7 @@ namespace RickAndMortyTogether
         void ResetItems()
         {
             foreach (NetItem item in items.Values) StopFollowing(item);
-            items.Clear(); itemOf.Clear(); itemScene = ""; nextItemScan = 0;
+            items.Clear(); itemOf.Clear(); passedOver.Clear(); Started.Clear(); itemScene = ""; nextItemScan = 0;
             triggers.Clear(); triggerOf.Clear(); FollowingControls.Clear(); ResetSpawns();
         }
 
@@ -71,24 +71,32 @@ namespace RickAndMortyTogether
             return h == 0 ? 1u : h;
         }
 
-        void ScanItems()
+        // Grabbables the game just started (Harmony postfix on GrabbableItem.Start), looked at on the next frame: new
+        // things show up at once without searching the whole scene (the garage holds some 21,000 objects).
+        public static readonly List<GrabbableItem> Started = new List<GrabbableItem>();   // process-scoped (drained every frame)
+        // Grabbables that are not synced (no body, someone's own, a duplicate path): not looked at again.
+        readonly HashSet<GrabbableItem> passedOver = new HashSet<GrabbableItem>();
+
+        void ScanItems() { ScanItems(UnityEngine.Object.FindObjectsOfType<GrabbableItem>(), true); }
+
+        void ScanItems(IList<GrabbableItem> found, bool full)
         {
             string scene = SceneManager.GetActiveScene().name;
-            if (scene != itemScene) { foreach (NetItem old in items.Values) StopFollowing(old); items.Clear(); itemOf.Clear(); triggers.Clear(); triggerOf.Clear(); FollowingControls.Clear(); ResetSpawns(); itemScene = scene; }
+            if (scene != itemScene) { foreach (NetItem old in items.Values) StopFollowing(old); items.Clear(); itemOf.Clear(); passedOver.Clear(); triggers.Clear(); triggerOf.Clear(); FollowingControls.Clear(); ResetSpawns(); itemScene = scene; }
             int added = 0;
-            foreach (GrabbableItem grab in UnityEngine.Object.FindObjectsOfType<GrabbableItem>())
+            foreach (GrabbableItem grab in found)
             {
-                if (itemOf.ContainsKey(grab)) continue;
+                if (grab == null || itemOf.ContainsKey(grab) || passedOver.Contains(grab)) continue;
                 Rigidbody body = grab.GetComponent<Rigidbody>();
                 LimitedIndirectGrabbableController control = grab.GetComponent<LimitedIndirectGrabbableController>();
-                if (body == null && control == null) continue;
+                if (body == null && control == null) { passedOver.Add(grab); continue; }
                 // Each player's own spectator camera is theirs (it travels in their pose, see Spectator.cs).
-                if (grab.GetComponentInParent<SpectatorCameraController>() != null) continue;
+                if (grab.GetComponentInParent<SpectatorCameraController>() != null) { passedOver.Add(grab); continue; }
                 if (IsSpawned(grab.transform)) { FoundSpawned(grab, body, control); continue; }
                 string key = KeyOf(grab.transform);
-                if (control != null && PerPlayerControl(key)) continue;
+                if (control != null && PerPlayerControl(key)) { passedOver.Add(grab); continue; }
                 uint id = Hash(key);
-                if (items.ContainsKey(id)) continue;   // a duplicate path (an unnamed runtime clone) stays local for now
+                if (items.ContainsKey(id)) { passedOver.Add(grab); continue; }   // a duplicate path (an unnamed runtime clone) stays local
                 NetItem item = new NetItem { Id = id, Key = key, Grab = grab, Body = body, Control = control, Owner = 0, OriginalKinematic = body != null && body.isKinematic };
                 items[id] = item; itemOf[grab] = item;
                 added++;
@@ -96,6 +104,7 @@ namespace RickAndMortyTogether
                 if (!Hosting && !Mutant("nofollow")) StartFollowing(item);
             }
             if (added > 0) Log("Items: " + added + " new in " + scene + " (" + items.Count + " synced)");
+            if (!full) return;
             ScanTriggers();
             HookHands();
         }
@@ -267,7 +276,8 @@ namespace RickAndMortyTogether
         void ItemsUpdate()
         {
             float now = Time.realtimeSinceStartup;
-            if (now >= nextItemScan) { nextItemScan = now + 0.5f; ScanItems(); }
+            if (now >= nextItemScan) { nextItemScan = now + 3f; Started.Clear(); ScanItems(); }
+            else if (Started.Count > 0) { GrabbableItem[] fresh = Started.ToArray(); Started.Clear(); ScanItems(fresh, false); }
             SpawnsUpdate(now);
             float k = 1f - Mathf.Exp(-Time.deltaTime * 20f);
             foreach (NetItem item in items.Values)

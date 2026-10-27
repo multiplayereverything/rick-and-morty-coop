@@ -1,6 +1,9 @@
 # Handoff
 
-## State (2026-10-27, 0.5.0, protocol 5)
+## State (2026-10-28, 0.6.0, protocol 6)
+
+- Enemies (`src/Enemies.cs`, tour `enemies`), per-player death (`src/Story.cs`, tour `death`), final boss state
+  (`src/Boss.cs`, tour `boss`), every mission area played through together (tour `playthrough`).
 
 - Spawns and despawns: host ids, client adopts / copies / removes (`src/Spawns.cs`, tour `spawns`, mutants
   `nospawnmatch`, `nospawnremove`, `nodespawn`).

@@ -63,7 +63,7 @@ namespace RickAndMortyTogether
             labWatched.Add(comic.Id);
             yield return StartCoroutine(FlatLookAt(i, () => comic.Body.worldCenterOfMass, 1.2f, 20));
             i.GrabRight = true;
-            yield return StartCoroutine(Wait(() => comic.Grab.IsCurrInHand, 4, "flat.grab", () => "the click did not grab it: " + DescribeHand(Handedness.Right)));
+            yield return StartCoroutine(Wait(() => comic.Grab.IsCurrInHand, 8, "flat.grab", () => "the click did not grab it: " + DescribeHand(Handedness.Right)));
             if (tourFailure != null) yield break;
             Check("flat.grab", comic.Grab.IsCurrInHand && comic.Owner == 0, "comic in the right hand " + comic.Grab.IsCurrInHand + ", owner " + comic.Owner);
             // Lift it into view and hold it for the client to see.

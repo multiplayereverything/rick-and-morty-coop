@@ -71,6 +71,8 @@ namespace RickAndMortyTogether
         readonly Vector3[] rigHand = { new Vector3(-0.2f, 1.1f, 0.3f), new Vector3(0.2f, 1.1f, 0.3f) };
         readonly bool[] rigGrab = new bool[2];
         public float RigHandSpeed = 1.2f;   // m/s toward the target, like a person reaching
+        // Tours that teleport: the head and hand targets are in the play area (they move with teleports), not the world.
+        public bool RigRelative;
 
         public void RigSetHand(Handedness side, Vector3 target) { rigHand[side == Handedness.Left ? 0 : 1] = target; }
         public void RigGrab(Handedness side, bool grab) { rigGrab[side == Handedness.Left ? 0 : 1] = grab; }
@@ -83,14 +85,16 @@ namespace RickAndMortyTogether
             if (m == null || m.HMDCamera == null || !m.DebugModeEnabled) return;
             float t = Time.time;
             Transform head = m.HMDCamera.transform;
-            head.position = RigHead + new Vector3(Mathf.Sin(t * 0.7f) * 0.05f, Mathf.Sin(t * 1.3f) * 0.02f, 0);
+            Transform root = m.transform;
+            Vector3 headAt = RigHead + new Vector3(Mathf.Sin(t * 0.7f) * 0.05f, Mathf.Sin(t * 1.3f) * 0.02f, 0);
+            head.position = RigRelative ? root.TransformPoint(headAt) : headAt;
             head.rotation = Quaternion.Euler(10f + Mathf.Sin(t * 0.9f) * 5f, RigYaw + Mathf.Sin(t * 0.5f) * 15f, 0);
             foreach (HandController hand in m.Hands)
             {
                 if (hand == null) continue;
                 int i = hand.Handedness == Handedness.Left ? 0 : 1;
                 Transform tracked = hand.TrackedTransform;
-                tracked.position = Vector3.MoveTowards(tracked.position, rigHand[i], RigHandSpeed * Time.deltaTime);
+                tracked.position = Vector3.MoveTowards(tracked.position, RigRelative ? root.TransformPoint(rigHand[i]) : rigHand[i], RigHandSpeed * Time.deltaTime);
                 tracked.rotation = Quaternion.Euler(0, RigYaw, hand.Handedness == Handedness.Left ? 20f : -20f);
                 Debug_TrackedInputController input = hand.GetDebugTrackedController();
                 if (input != null) input.isGrabbing = rigGrab[i];

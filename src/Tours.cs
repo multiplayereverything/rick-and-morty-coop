@@ -22,6 +22,10 @@ namespace RickAndMortyTogether
             else if (labTour == "portrait") StartCoroutine(Portrait());
             else if (labTour == "full") StartCoroutine(FullGame());
             else if (labTour == "flat") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? FlatHost() : FlatClient());
+            else if (labTour == "enemies") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? EnemiesHost() : EnemiesClient());
+            else if (labTour == "death") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? DeathHost() : DeathClient());
+            else if (labTour == "playthrough") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? PlayHost() : PlayClient());
+            else if (labTour == "boss") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? BossHost() : BossClient());
             else if (labTour == "spawns") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? SpawnsHost() : SpawnsClient());
             else if (labTour == "spectator") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? SpectatorHost() : SpectatorClient());
             else if (labTour == "story") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? StoryHost() : StoryClient());

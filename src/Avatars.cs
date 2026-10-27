@@ -159,7 +159,8 @@ namespace RickAndMortyTogether
 
         static void Move(Transform t, Vector3 position, Quaternion rotation, float k)
         {
-            if ((t.position - position).sqrMagnitude > 4f) { t.position = position; t.rotation = rotation; return; }
+            // More than half a metre in one pose (a teleport, a flat-screen hand snapping back): snap, don't glide.
+            if ((t.position - position).sqrMagnitude > 0.25f) { t.position = position; t.rotation = rotation; return; }
             t.position = Vector3.Lerp(t.position, position, k);
             t.rotation = Quaternion.Slerp(t.rotation, rotation, k);
         }
@@ -186,6 +187,7 @@ namespace RickAndMortyTogether
             foreach (Peer p in peers.Values)
             {
                 if (!p.HasPose || Master == null) continue;
+                if (p.Avatar != null && Hosting && !Mutant("noenemytarget")) RemoteHead.Attach(p.Avatar, p.Id);
                 if (p.Avatar == null) { p.Avatar = new Avatar(p.Id, p.Name); Log("Avatar for " + p.Name + " (Morty head " + p.Avatar.HeadIsMorty + ", Morty hands " + p.Avatar.HandsAreMorty + ")"); }
                 p.Avatar.SetName(p.Name);
                 // Someone in another scene of the game is not drawn here.

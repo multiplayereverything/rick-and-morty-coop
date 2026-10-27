@@ -23,7 +23,7 @@ namespace RickAndMortyTogether
     // (later) story; every player owns their own head and hands.
     public sealed partial class TogetherRuntime : MonoBehaviour
     {
-        public const string ModVersion = "0.5.0";
+        public const string ModVersion = "0.6.0";
         public static TogetherRuntime Instance;   // process-scoped
         public static Action<string> Log = delegate { };   // process-scoped
         public static string Root = "";   // process-scoped
@@ -160,13 +160,15 @@ namespace RickAndMortyTogether
                     if (Hosting && now >= nextScene) { nextScene = now + 5f; BroadcastScene(); }
                     ItemsUpdate();
                     StoryUpdate(now);
+                    EnemiesUpdate(now);
+                    BossUpdate(now);
                 }
                 AvatarsUpdate();
                 SpectatorUpdate();
                 RigUpdate();
                 FlatUpdate();
             }
-            catch (Exception ex) { Log("ST-MODERROR update: " + ex); }
+            catch (Exception ex) { ModError("update", ex); }
             labWatch.Stop();
             labModTicks += labWatch.ElapsedTicks; labFrames++;
             LabUpdate();
@@ -259,6 +261,7 @@ namespace RickAndMortyTogether
                 case Op.TriggerFired: HostTriggerFired(from, r); return;
                 case Op.Cause: HostCause(from, r); return;
                 case Op.Despawn: HostDespawn(from, r); return;
+                case Op.EnemyHit: HostEnemyHit(from, r); return;
                 default: throw new IOException("op " + op + " is not accepted from clients");
             }
         }
@@ -326,6 +329,9 @@ namespace RickAndMortyTogether
                 case Op.Areas: ClientAreas(r); return;
                 case Op.Spawn: ClientSpawn(r); return;
                 case Op.Despawn: ClientDespawn(r); return;
+                case Op.Enemies: ClientEnemies(r); return;
+                case Op.PlayerHit: ClientPlayerHit(r); return;
+                case Op.BossState: ClientBossState(r); return;
                 default: throw new IOException("op " + op + " is not expected from the host");
             }
         }

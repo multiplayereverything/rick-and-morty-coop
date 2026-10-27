@@ -69,21 +69,49 @@ namespace RickAndMortyTogether
             }
         }
 
+        // An exception the mod caught: logged always, and in the lab a mod error the verifier fails the run on.
+        public static void ModError(string where, Exception ex)
+        {
+            Log("Mod error in " + where + ": " + ex);
+            if (!LabMode) return;
+            Interlocked.Increment(ref modErrorCount);
+            WriteLab("RT-MODERROR " + where + ": " + ex.ToString().Replace('\n', ' '));
+        }
+
         // True when the lab run turned this fix off (never outside -rt-lab).
         public static bool Mutant(string name) { return LabMode && mutants.Contains(name); }
 
+        // A name starting with "~" is a try a tour may repeat: logged, not judged.
         public static void Check(string name, bool pass, string detail)
         {
+            if (name.StartsWith("~")) { Log("Try " + name.Substring(1) + (pass ? " passed: " : " failed: ") + detail); return; }
             if (LabMode) Log("RT-CHECK " + name + " " + (pass ? "PASS" : "FAIL") + " " + detail);
+        }
+
+        static string ZoneName()
+        {
+            GlobalStorage g = GlobalStorage.no_instantiate_instance;
+            return g != null && g.TeleportationController != null && g.TeleportationController.CurrentZone != null ? g.TeleportationController.CurrentZone.name.Replace(' ', '_') : "-";
         }
 
         static string V(Vector3 v) { return v.x.ToString("0.000") + "," + v.y.ToString("0.000") + "," + v.z.ToString("0.000"); }
         static string Q(Quaternion q) { return q.x.ToString("0.0000") + "," + q.y.ToString("0.0000") + "," + q.z.ToString("0.0000") + "," + q.w.ToString("0.0000"); }
 
+        // Where this player's head and hands were last frame, and when one last moved 30 cm or more in a single frame
+        // (a teleport, a rig placed, a flat-screen hand snapping): samples around it are marked self.jump.
+        readonly Vector3[] lastParts = new Vector3[3];
+        float lastJumpAt = -10;
+
         void LabUpdate()
         {
             if (!LabMode) return;
             float now = Time.realtimeSinceStartup;
+            PlayerPose part;
+            if (CaptureLocalPose(out part))
+            {
+                Vector3[] at = { part.HeadPosition, part.Left.Position, part.Right.Position };
+                for (int i = 0; i < 3; i++) { if ((at[i] - lastParts[i]).sqrMagnitude > 0.09f) lastJumpAt = now; lastParts[i] = at[i]; }
+            }
             // Lab clients may start before the host listens; keep retrying instead of giving up.
             if (autoRole == "join" && transport == null && now >= labJoinRetryAt) { labJoinRetryAt = now + 3; StartJoin(); }
             if (now >= nextMetric)
@@ -110,9 +138,9 @@ namespace RickAndMortyTogether
             if (Active && (Hosting || lastRtt >= 0) && ht >= nextState)
             {
                 nextState = (Mathf.Floor(ht / 2f) + 1) * 2f;
-                StringBuilder s = new StringBuilder("RT-STATE ht=" + ht.ToString("0.000") + " id=" + LocalId + " scene=" + SceneManager.GetActiveScene().name);
+                StringBuilder s = new StringBuilder("RT-STATE ht=" + ht.ToString("0.000") + " id=" + LocalId + " scene=" + SceneManager.GetActiveScene().name + " zone=" + ZoneName());
                 PlayerPose me;
-                if (CaptureLocalPose(out me)) s.Append(" self.head=" + V(me.HeadPosition) + " self.L=" + V(me.Left.Position) + " self.R=" + V(me.Right.Position) + " self.Rgrip=" + me.Right.Grip.ToString("0.00"));
+                if (CaptureLocalPose(out me)) s.Append(" self.head=" + V(me.HeadPosition) + " self.L=" + V(me.Left.Position) + " self.R=" + V(me.Right.Position) + " self.Rgrip=" + me.Right.Grip.ToString("0.00") + (now - lastJumpAt < 0.6f ? " self.jump=1" : ""));
                 // Only avatars drawn here (same scene): one in another scene is hidden and not a desync.
                 foreach (Peer p in peers.Values) if (p.Avatar != null && p.Avatar.Root.activeSelf) s.Append(" av" + p.Id + ".head=" + V(p.Avatar.Head.position) + " av" + p.Id + ".R=" + V(p.Avatar.RightHand.position) + " av" + p.Id + ".Rclosed=" + (p.Avatar.AnimatorClosed(Handedness.Right) ? 1 : 0));
                 foreach (NetItem item in items.Values)

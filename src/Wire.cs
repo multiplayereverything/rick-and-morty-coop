@@ -4,12 +4,12 @@ using UnityEngine;
 
 namespace RickAndMortyTogether
 {
-    public enum Op : byte { Hello = 1, Welcome, Reject, Roster, Leave, Ping, Pong, Pose, Scene, ItemClaim, ItemOwner, ItemState, ControlState, TriggerFired, Cause, Stage, Area, Areas, Spawn, Despawn }
+    public enum Op : byte { Hello = 1, Welcome, Reject, Roster, Leave, Ping, Pong, Pose, Scene, ItemClaim, ItemOwner, ItemState, ControlState, TriggerFired, Cause, Stage, Area, Areas, Spawn, Despawn, Enemies, EnemyHit, PlayerHit, BossState }
 
     public static class Wire
     {
         // Bump on every protocol change; a joiner with another version is refused with both versions in the message.
-        public const int Version = 5;
+        public const int Version = 6;
 
         public static byte[] Packet(Op op, Action<BinaryWriter> write)
         {

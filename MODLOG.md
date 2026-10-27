@@ -2,6 +2,54 @@
 
 Newest first. Each entry: what changed, why, and how it was tested. Decisions made without asking are marked **Decision**.
 
+## 0.6.0 (2026-10-28, protocol 6)
+
+Enemies, the final boss and death work in co-op; the whole garage, every mission area, is played through together.
+
+- **Enemies** (the egg shoot-out's gunmen, a fixed pool under `EnemyManager`, so a pool index is a shared id): the
+  host's game runs them and streams each one's state (on, alive, pose) at 15 Hz (`Op.Enemies`). A client spawns and
+  moves none itself (its `RunPhase1/RunPhase2` are held, a mirrored enemy's own routines stopped) and places the host's.
+  A client's hit (gun, thrown item) goes to the host (`Op.EnemyHit`), which applies it; the death then plays on the
+  client too, which also counts the kill for its own story. Enemies aim at the nearest player: on the host another
+  player's drawn head gets a collider on the layer of the player's own `HurtTarget` (what enemy bullets look for), and
+  a bullet that hits it goes to that player (`Op.PlayerHit`), who takes it through their own `HurtTarget`.
+- **Death** is one player's own: the Death area, the DEATH / RESPAWN events and every story event a dead player raises
+  stay on their copy; nobody is pulled into or out of a death by area or zone following.
+- **Final boss**: its state machine (`FinalBossController.SetState`) runs on the host; each state change goes to the
+  clients (`Op.BossState`, and every 2 s), and a client's boss changes state only when the host's did.
+  - **Decision:** in the killing state each copy's boss aims at its own player, so the death beam kills both players
+    (each respawns in their own game): the boss threatens everyone in the room.
+- **Playthrough** of every mission area: entered the way the blast-shield portal does it (the garage stays on, the
+  next mission on, the previous off). A client in an area that goes off is brought to the host.
+- **Fix:** the mod took 3.3-3.9 ms a frame in the garage (21,000 objects) because 0.5.0 searched all grabbables every
+  0.5 s. New grabbables now register when the game starts them (`GrabbableItem.Start` postfix); a full search runs
+  every 3 s, and grabbables that are never synced are not looked at again.
+- **Fix:** a client following the host into the garage while its own living room was still starting called the game's
+  scene cleanup too early (NullReferenceException); it now waits for its teleport system and rig. Exceptions the mod
+  catches are now mod errors in the lab (they were logged under a name the verifier didn't count).
+- **Fix:** loading the garage reloads the story stage from the copy's own save (a fresh one for a guest), so a client
+  arriving in the garage dropped back to the first stage, and the host's 3 s snapshot did not put it back (it only
+  applied a stage when the host's had changed). The snapshot now puts it back whenever they differ. Found by the
+  `boss` tour (the client's boss never appeared). Mutant `nostagerepair`.
+- **Lab:** `enemies`, `death`, `boss` and `playthrough` tours. The lab rig can stand in the play area
+  (`RigRelative`), so it moves with teleports. The verifier leaves out the first state sample after a teleport, and
+  does not judge frame cost or NPC line timing when a copy ran under 27 fps (other labs on this PC starved it); the
+  run output says so instead. A copy flags its own instant jumps (a part moving 30 cm in one frame); the verifier does
+  not compare that player at that sample. Hands that jump more than half a metre snap, like heads. Tours can make
+  unjudged tries (check names starting with `~`): the controls tour retries closing a door the hand slipped off.
+- **Tested** (another session's lab had the CPU at 90-100% for most of these runs):
+  - `enemies`: PASS, 9/9 host, 6/6 client: the same enemies 0.00 m apart, a client hit applied by the host and the
+    death shown on the client, every enemy aims at the client in the arena, the bullet ray hits its head, the hit goes
+    to the client and it dies in its own game.
+  - `death`: PASS, 4/4 host, 5/5 client: the client dies, stays in its death area 10 s, respawns; the host never dies.
+  - `boss`: PASS, 5/5 host, 4/4 client: the client's stage repaired to the boss stage, the boss's entrance and battle
+    shown from the host's states, the client's own state change held.
+  - `playthrough`: PASS, 14/14 host, 8/8 client: shoot-out, bathroom, petri dish, Troy, satellite and home; the
+    client brought along each time its area went off.
+  - Every earlier tour again: hand-off, controls, story, spectator, spawns, flat (twice at 6-13 fps), full: PASS.
+  - Mutants: 19, every one caught by its tour (`noenemysync`, `noenemytarget`, `nodeathlocal`, `nobosssync`,
+    `nostagerepair` new).
+
 ## 0.5.0 (2026-10-27, protocol 5)
 
 Things the game makes while playing, and things it destroys, are shared. Flat-screen mode: play without a headset.
