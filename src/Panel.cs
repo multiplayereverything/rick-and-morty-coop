@@ -101,6 +101,7 @@ namespace RickAndMortyTogether
             else DrawSession();
             GUILayout.Space(8);
             GUILayout.Label("F5 closes this panel. Two players: the host's game is the shared one.", dimStyle);
+            if (FlatMode) GUILayout.Label("No headset: mouse looks, WASD walks, click to grab (left/right hand), wheel reaches, E/Q trigger, T teleport, M menu, hold Alt for the cursor.", dimStyle);
             GUI.DragWindow(new Rect(0, 0, 10000, 30));
         }
 

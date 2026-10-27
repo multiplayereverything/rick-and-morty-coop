@@ -4,9 +4,9 @@ Co-op for **Rick and Morty: Virtual Rick-ality** (Steam, VR). Two players share 
 clones in the same garage, see each other's head and hands, and can pick things up, throw them and pass them from
 hand to hand.
 
-**Status: 0.4.0 pre-release.** Players, hands, grabbable items, doors, levers, sliders, buttons, the story, level
+**Status: 0.5.0 pre-release.** Players, hands, grabbable items, doors, levers, sliders, buttons, the story, level
 changes, and Rick's and Morty's lines and animations are shared, with the host's game in charge (see
-[What is shared](#what-is-shared)). Not shared yet: things the game spawns (machine results, dispensers).
+[What is shared](#what-is-shared)). Things the game makes or destroys while you play are shared too.
 
 ## Install
 
@@ -39,6 +39,27 @@ headset on, or ask someone at the PC.
 
 A third player is refused with "The game is full (2 players)." Everyone needs the same mod version; a different version is refused with both versions named.
 
+## Play without a headset (flat-screen mode)
+
+In Steam: right-click the game > Properties > Launch options, type `-vrmode None`, and start the game. With no headset
+running, the mod switches to keyboard and mouse:
+
+| Key | Does |
+| --- | --- |
+| Mouse | Look around |
+| W A S D, Shift | Walk, walk faster |
+| Ctrl | Crouch |
+| Left click / right click (hold) | Grab with the right / left hand |
+| Mouse wheel | Reach nearer or further |
+| E / Q | Right / left hand trigger (fire, use) |
+| T | Teleport to the pad you are looking at |
+| M | Menu button (the DVD tutorial's "PRESS IT") |
+| Alt (hold) | Free the mouse cursor |
+| F5 | The co-op panel |
+
+A flat-screen player and a headset player can play together; the other player sees the same Morty head and hands.
+Remove the launch option to play in VR again.
+
 ## What is shared
 
 | Part | Shared? | How |
@@ -52,7 +73,7 @@ A third player is refused with "The game is full (2 players)." Everyone needs th
 | Story | Yes | The host's game decides what happened; anything you do that moves the story is sent to the host and happens for everyone. |
 | Rick's and Morty's lines and animations | Yes | Same line at the same moment for everyone, including the game's random choices. |
 | Spectator mode | Yes | If someone's spectator camera is out in the room, everyone sees it there. "Cycle cameras" also lets your desktop window watch through each other player's eyes. |
-| Things the game spawns | Not yet | Machine results, dispensers and the laundry pile appear separately on each player's side for now. |
+| Things the game makes or destroys | Yes | Machine results, dispenser drops and the like exist once, in the host's game, for both players; something eaten or smashed goes for both. |
 | Saves | Host only | A player in someone else's game keeps their own save untouched. |
 
 ## Known limits

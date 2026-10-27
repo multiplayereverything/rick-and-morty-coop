@@ -2,6 +2,42 @@
 
 Newest first. Each entry: what changed, why, and how it was tested. Decisions made without asking are marked **Decision**.
 
+## 0.5.0 (2026-10-27, protocol 5)
+
+Things the game makes while playing, and things it destroys, are shared. Flat-screen mode: play without a headset.
+
+- **Spawns:** the game makes items from about forty places (combinator results, dispensers, Youseeks, Meeseeks,
+  laundry, deliveries). Most already run on both copies because what triggers them is shared, so instead of hooking
+  each one: every new grabbable whose path holds "(Clone)" gets an id from the host, which announces it (`Op.Spawn`:
+  scene, name, pose). A client adopts its own new item with the same name within 1.5 m made in the same few seconds
+  (it then follows the host's); with none, it copies an object of that name; one of its own that nothing claims
+  within 3 s is removed, because the host's game did not make it.
+  - **Decision:** match by name and place, not by hooking each spawner. One generic rule covers every spawner,
+    including ones not yet seen in a tour; a spawner whose result differs per copy (random laundry) ends with the
+    host's choice, because the client's unclaimed one is removed and the host's is copied.
+- **Despawns:** an item destroyed in the host's game (eaten, recycled, smashed) is destroyed on the client
+  (`Op.Despawn`); one destroyed while a client holds it is a request the host carries out.
+- **Arriving in a scene:** a player who arrives in the host's scene gets that scene's current items (what the game
+  made, owners, resting places), not the scene as it loads.
+- **Flat-screen mode** (the user's request): start the game with `-vrmode None`; with no headset the mod drives the
+  game's debug hands from keyboard and mouse (mouse look, WASD, Shift, Ctrl crouch, click to grab with either hand,
+  wheel for reach, E/Q triggers, T teleport to the pad in view, M menu, Alt frees the cursor). The debug hands only
+  know "grab", so the mod answers the trigger and menu buttons for them (Harmony postfix on
+  `Debug_TrackedInputController.GetButtonDetailedControllerIsReady`).
+  - **Decision:** a click reaches for the grabbable item in the middle of the view (within 2 m) and presses grab when
+    the hand arrives: the game only grabs on a press with the item already in the hand, and a mouse can't place a
+    hand in 3D the way a controller can. The hand goes first to a spot 25 cm in front of the item at its height, then
+    straight in: a straight line from the eyes clipped the cabinet top and knocked the comic book deeper inside.
+  - **Decision:** hands stay level (turned with the view's yaw only); tipped down with the view they hit the shelf
+    above an item. The player walks inside a 4 x 4 m area around the teleport spot, like a large play space.
+  - `flat` tour (host in flat mode, driven through `FlatSim`, never real input): PASS, 9/9 host, 3/3 client: a quarter
+    turn is 90.0 degrees, one second of W walks 1.44 m, a click on the comic book grabs it and the client sees it in
+    the flat player's closed hand, trigger and menu reach the game (3 runs in a row). Teleport: the living room has no second pad, so
+    T is untested. Mutants `noflatreach`, `noflatbuttons`.
+- **Tested:** `spawns` tour: PASS, 6/6 each side: a host-only item is copied on the client; an item both make at the
+  same moment is adopted (one there, not two); a client-only item is removed; an item the host destroys goes on the
+  client. Mutants `nospawnmatch`, `nospawnremove`, `nodespawn`.
+
 ## 0.4.0 (2026-10-27, protocol 4)
 
 Spectator mode is shared; the game takes two players.

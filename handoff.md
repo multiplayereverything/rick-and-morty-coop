@@ -1,6 +1,11 @@
 # Handoff
 
-## State (2026-10-27, 0.4.0, protocol 4)
+## State (2026-10-27, 0.5.0, protocol 5)
+
+- Spawns and despawns: host ids, client adopts / copies / removes (`src/Spawns.cs`, tour `spawns`, mutants
+  `nospawnmatch`, `nospawnremove`, `nodespawn`).
+- Flat-screen mode (`-vrmode None`): `src/Flat.cs`, tour `flat`, mutants `noflatreach`, `noflatbuttons`. Teleport (T)
+  is untested: the living room has one pad; test it in the garage.
 
 - Spectator mode: remote spectator cameras drawn, cycle visits other players' eyes (`src/Spectator.cs`, tour
   `spectator`, mutant `nospectatorview`).
@@ -18,7 +23,8 @@
 
 ## Next, in order
 
-1. **Spawns** (next): combinator results, respawners, Youseeks, laundry (random prefab: host picks).
+1. **Spawns in real play:** the `spawns` tour makes items with `Object.Instantiate`; watch a real combinator,
+   dispenser and the laundry in the garage (a garage tour) for names or places that don't match.
 2. **Mid-scene join:** a late joiner replays the scene's opening; send the Brain's running nodes or skip openings.
 3. **Real headset check of the fade path** (the lab loads without the fade).
 4. **NPC look-at / enemies:** retarget to the nearest player (`RickAnimationEventController`, `EnemyController`).

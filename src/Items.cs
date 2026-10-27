@@ -29,6 +29,7 @@ namespace RickAndMortyTogether
         public float TargetAmount, LastAmount = -1;
         public byte TargetLock, LastLock;
         public bool HasControlTarget, QuietControl;
+        public bool Spawned;           // made by the game while playing (Spawns.cs), id given by the host
     }
 
     // Host-authoritative item ownership. The host starts as owner of every item. Grabbing an item claims it; the
@@ -47,7 +48,7 @@ namespace RickAndMortyTogether
         {
             foreach (NetItem item in items.Values) StopFollowing(item);
             items.Clear(); itemOf.Clear(); itemScene = ""; nextItemScan = 0;
-            triggers.Clear(); triggerOf.Clear(); FollowingControls.Clear();
+            triggers.Clear(); triggerOf.Clear(); FollowingControls.Clear(); ResetSpawns();
         }
 
         public NetItem ItemById(uint id) { NetItem item; return items.TryGetValue(id, out item) ? item : null; }
@@ -73,7 +74,7 @@ namespace RickAndMortyTogether
         void ScanItems()
         {
             string scene = SceneManager.GetActiveScene().name;
-            if (scene != itemScene) { foreach (NetItem old in items.Values) StopFollowing(old); items.Clear(); itemOf.Clear(); triggers.Clear(); triggerOf.Clear(); FollowingControls.Clear(); itemScene = scene; }
+            if (scene != itemScene) { foreach (NetItem old in items.Values) StopFollowing(old); items.Clear(); itemOf.Clear(); triggers.Clear(); triggerOf.Clear(); FollowingControls.Clear(); ResetSpawns(); itemScene = scene; }
             int added = 0;
             foreach (GrabbableItem grab in UnityEngine.Object.FindObjectsOfType<GrabbableItem>())
             {
@@ -83,6 +84,7 @@ namespace RickAndMortyTogether
                 if (body == null && control == null) continue;
                 // Each player's own spectator camera is theirs (it travels in their pose, see Spectator.cs).
                 if (grab.GetComponentInParent<SpectatorCameraController>() != null) continue;
+                if (IsSpawned(grab.transform)) { FoundSpawned(grab, body, control); continue; }
                 string key = KeyOf(grab.transform);
                 if (control != null && PerPlayerControl(key)) continue;
                 uint id = Hash(key);
@@ -199,9 +201,12 @@ namespace RickAndMortyTogether
 
         void SendItemSnapshot(int to)
         {
+            // Things the game made while playing first, so the client knows them before their owners and states.
+            foreach (NetItem item in items.Values) if (item.Spawned && item.Grab != null) Send(to, SpawnPacket(item));
             foreach (NetItem item in items.Values)
             {
                 NetItem it = item;
+                if (it.Grab == null) continue;
                 Send(to, Wire.Packet(Op.ItemOwner, w => { w.Write(it.Id); w.Write(it.Epoch); w.Write((byte)it.Owner); }));
                 if (it.Owner == 0 && (it.Body != null || it.Control != null)) Send(to, StatePacket(it, true));
             }
@@ -262,7 +267,8 @@ namespace RickAndMortyTogether
         void ItemsUpdate()
         {
             float now = Time.realtimeSinceStartup;
-            if (now >= nextItemScan) { nextItemScan = now + 2f; ScanItems(); }
+            if (now >= nextItemScan) { nextItemScan = now + 0.5f; ScanItems(); }
+            SpawnsUpdate(now);
             float k = 1f - Mathf.Exp(-Time.deltaTime * 20f);
             foreach (NetItem item in items.Values)
             {

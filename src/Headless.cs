@@ -64,7 +64,7 @@ namespace RickAndMortyTogether
                 Log("Headless: rig created (" + core.MasterHMDAndInputController.GetType().Name + ")");
             }
             MasterHMDAndInputController m = Master;
-            if (m != null && !m.DebugModeEnabled) { m.DebugModeEnabled = true; RigActive = LabMode; }
+            if (m != null && !m.DebugModeEnabled) { m.DebugModeEnabled = true; RigActive = LabMode && !FlatMode; }
             // LoadGameWhenReady's own fade coroutine died on the missing rig; start the game the same way it would.
             if (!headlessLoaded && m != null && SceneManager.GetActiveScene().name == "Loading")
             {

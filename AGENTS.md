@@ -42,13 +42,14 @@ The user asked for these on every change to this mod. They favour care over spee
 | `ProgressionManager.SetStage`, `SceneController.BeginDelayedActivation/Deactivation`, `GlobalStorage.FadeAndLoadScene` | Stage, garage areas and scene loads follow the host. |
 | `BrainNodeStatusController.Execute`, `BrainControlledModule_Voice.DoInterruptLogicAndGetInterruptClip`, `BrainControlledModule_Core.WaitForRandomAmountOfTime` (`src/Npcs.cs`) | Seeded dice: the same NPC line on every copy. |
 | `SpectatorModeLogic.CycleTarget` (prefix/postfix), `FindAndSetTarget` (postfix), `ExternalCameraController.SetTarget` (`src/Spectator.cs`) | Spectator cycle visits other players' eyes. |
+| `Debug_TrackedInputController.GetButtonDetailedControllerIsReady` (postfix), debug hands' `isGrabbing`, HMD camera and tracked hand transforms (`src/Flat.cs`) | Flat-screen mode: keyboard and mouse drive the game's debug hands; trigger and menu buttons answered by the mod. |
 | `SaveLoad.Save` / `SaveLoad.Load` (Harmony prefixes, `src/Patches.cs`) | Lab never touches the shared save; clients don't save. |
 | `OwlchemyVRStorage.LoadCore`, `PlaySpaceSizeSelector`, `MasterHMDAndInputController.DebugModeEnabled` (reflection, `src/Headless.cs`) | Headless boot for the lab, only when no VR device is active. |
 | `Debug_TrackedInputController.isGrabbing`, `HandController.TrackedTransform`, HMD camera transform (`src/Rig.cs`) | Lab rig: scripted head, hands and grab. |
 
 ## Networking
 - **Wire:** `src/Wire.cs` (`Op`, `Wire.Version`), handlers in `TogetherRuntime.HostPacket` / `ClientPacket`
-  (`src/Runtime.cs`). The host accepts only `Hello, Leave, Ping, Pose, ItemClaim, ItemState, ControlState, TriggerFired, Cause` from clients.
+  (`src/Runtime.cs`). The host accepts only `Hello, Leave, Ping, Pose, ItemClaim, ItemState, ControlState, TriggerFired, Cause, Despawn` from clients.
 - **LAN / direct:** `src/Transport.cs`, TCP 27040, keepalives from the writer thread.
 - **Online:** `src/SteamLobby.cs` (lobbies, invites, `+connect_lobby`), `src/SteamNet.cs` (`ISteamNetworking` P2P,
   channel 7). The game's Steamworks.NET has no Steam Networking Sockets.

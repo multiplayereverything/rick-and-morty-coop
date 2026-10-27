@@ -16,13 +16,14 @@ namespace RickAndMortyTogether
         public bool HasPose;
         public float PoseAt;
         public Avatar Avatar;
+        public string SnapshotScene = "";   // the host scene this player last got the item snapshot for
     }
 
     // The co-op core: one per game, kept across scene loads. Host-authoritative: the host decides item ownership and
     // (later) story; every player owns their own head and hands.
     public sealed partial class TogetherRuntime : MonoBehaviour
     {
-        public const string ModVersion = "0.4.0";
+        public const string ModVersion = "0.5.0";
         public static TogetherRuntime Instance;   // process-scoped
         public static Action<string> Log = delegate { };   // process-scoped
         public static string Root = "";   // process-scoped
@@ -75,6 +76,7 @@ namespace RickAndMortyTogether
             InitLab(args);
             LoadSettings();
             InitHeadless();
+            InitFlat(args);
             Log("Rick and Morty Together " + ModVersion + " (protocol " + Wire.Version + ") ready" + (autoRole.Length > 0 ? ", auto role " + autoRole : ""));
         }
 
@@ -162,6 +164,7 @@ namespace RickAndMortyTogether
                 AvatarsUpdate();
                 SpectatorUpdate();
                 RigUpdate();
+                FlatUpdate();
             }
             catch (Exception ex) { Log("ST-MODERROR update: " + ex); }
             labWatch.Stop();
@@ -255,6 +258,7 @@ namespace RickAndMortyTogether
                 case Op.ControlState: HostState(from, r, Op.ControlState); return;
                 case Op.TriggerFired: HostTriggerFired(from, r); return;
                 case Op.Cause: HostCause(from, r); return;
+                case Op.Despawn: HostDespawn(from, r); return;
                 default: throw new IOException("op " + op + " is not accepted from clients");
             }
         }
@@ -320,6 +324,8 @@ namespace RickAndMortyTogether
                 case Op.Stage: ClientStage(r); return;
                 case Op.Area: ClientArea(r); return;
                 case Op.Areas: ClientAreas(r); return;
+                case Op.Spawn: ClientSpawn(r); return;
+                case Op.Despawn: ClientDespawn(r); return;
                 default: throw new IOException("op " + op + " is not expected from the host");
             }
         }

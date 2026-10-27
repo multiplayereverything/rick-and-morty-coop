@@ -303,6 +303,11 @@ namespace RickAndMortyTogether
             if (Hosting)
             {
                 if (now >= nextAreaSync) { nextAreaSync = now + 3f; BroadcastAreas(); }
+                // A player who just arrived in the host's scene gets what is in it now (what the game made, owners,
+                // where things rest), not the scene as it loads.
+                string mine = SceneManager.GetActiveScene().name;
+                foreach (Peer p in peers.Values)
+                    if (p.Accepted && p.HasPose && p.Pose.Scene == mine && p.SnapshotScene != mine) { p.SnapshotScene = mine; SendItemSnapshot(p.Id); }
                 return;
             }
             string here = SceneManager.GetActiveScene().name;

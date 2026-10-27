@@ -23,6 +23,12 @@ $tours = @{
     'spectator' = @{ Seconds = 200; Expect = @(
         'spectator.host.on@host', 'spectator.host.camera@host', 'spectator.host.watch@host', 'spectator.host.back@host',
         'spectator.client.sees.on@c1', 'spectator.client.sees.camera@c1', 'spectator.client.sees.off@c1', 'tour.done') }
+    'flat' = @{ Seconds = 240; HostArgs = '-rt-flat'; Expect = @(
+        'flat.on@host', 'flat.look@host', 'flat.walk@host', 'flat.grab@host', 'flat.buttons@host', 'flat.teleport@host',
+        'flat.client.sees.grab@c1', 'tour.done') }
+    'spawns' = @{ Seconds = 200; Expect = @(
+        'spawns.host.announced@host', 'spawns.host.despawned@host', 'spawns.host.one@host',
+        'spawns.client.copied@c1', 'spawns.client.adopted@c1', 'spawns.client.removed@c1', 'spawns.client.despawned@c1', 'tour.done') }
     'full' = @{ Seconds = 120; Expect = @('net.welcome@c1', 'net.rejected@c2', 'full.host.one@host', 'tour.done@host') }
     'portrait' = @{ Seconds = 120; Expect = @('avatar.morty', 'portrait.saved', 'tour.done') }
     'survey' = @{ Seconds = 90; Expect = @('tour.done@host') }
@@ -41,6 +47,7 @@ foreach ($old in @(Get-ChildItem $labRoot -Filter 'rick-and-morty-together-lab.l
     }
 }
 $hostArgs = ''; $clientArgs = ''
+if ($spec.HostArgs) { $hostArgs = ' ' + $spec.HostArgs }
 $name = $Tour
 if ($Lag -gt 0) { $hostArgs += " -rt-lag $Lag"; $clientArgs += " -rt-lag $Lag"; $name += "-lag$Lag" }
 if ($Mutate) { $hostArgs += " -rt-mutate $Mutate"; $clientArgs += " -rt-mutate $Mutate"; $name = "mutants/$Tour-$($Mutate -replace ',', '+')" }
