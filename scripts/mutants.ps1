@@ -24,6 +24,7 @@ $mutants = [ordered]@{
     'noheadlessteleport' = 'flat' # without a headset, teleporting stays off after a scene load
     'nospawnwait' = 'spawns'  # a client drops a spawn announcement it has nothing to copy for, then removes its own late copy
     'nospawntemplate' = 'garage' # a part only the host's game made never appears on a client that has none out
+    'nolaundryunparent' = 'garage' # the laundry zone's game error (deprecated LevelController) on a client
     'noattachwait' = 'garage' # a client registers its own attached computer parts and removes them as made only here
     'nocause'   = 'story'     # story events are neither sent by the host nor held back on clients
     'nospectatorview' = 'spectator'  # cycling spectator cameras never visits the other players' views

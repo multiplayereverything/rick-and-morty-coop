@@ -13,6 +13,8 @@ namespace RickAndMortyTogether
     //    has none out, must still get one.
     // 2. Both copies repair the computer (what the shared story does on each), the client 4 s after the host (a slower
     //    machine): each keeps its own attached parts; the mod copies and removes none of them.
+    // 3. On the client, an item leaves the laundry zone while still its child (what a client's copy following the host's
+    //    dumped laundry does when its own Rick dumps later): the game's handler must not throw.
     public sealed partial class TogetherRuntime
     {
         const BindingFlags AnyField = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
@@ -78,6 +80,34 @@ namespace RickAndMortyTogether
             Check(check, PadHere() == StartPad(), "on " + PadHere() + ", the game's start pad here is " + StartPad());
         }
 
+        string laundryResult = "";   // session-scoped: what the laundry step saw, for its check
+
+        // Puts an item in the laundry zone as its child and has the zone see it leave (the zone's own trigger handlers).
+        bool LeaveLaundryZone()
+        {
+            UnpartentOnExitItemCollectionZone unparent = Object.FindObjectOfType<UnpartentOnExitItemCollectionZone>();
+            if (unparent == null) { laundryResult = "no laundry zone here"; return false; }
+            ItemCollectionZone zone = (ItemCollectionZone)typeof(UnpartentOnExitItemCollectionZone).GetField("itemCollectionZone", AnyField).GetValue(unparent);
+            PickupableItem item = null;
+            foreach (PickupableItem p in Object.FindObjectsOfType<PickupableItem>())
+                if (p.GetComponent<Rigidbody>() != null && !p.IsCurrInHand && ItemIdOf(p) == 0) { item = p; break; }
+            if (item == null) { laundryResult = "no unsynced item to move"; return false; }
+            Transform before = item.transform.parent;
+            Rigidbody body = item.GetComponent<Rigidbody>();
+            BindingFlags any = BindingFlags.Instance | BindingFlags.NonPublic;
+            try
+            {
+                if (!zone.ItemsInCollection.Contains(item)) typeof(ItemCollectionZone).GetMethod("RigidbodyEnteredTrigger", any).Invoke(zone, new object[] { body });
+                item.transform.parent = unparent.transform;
+                typeof(ItemCollectionZone).GetMethod("RigidbodyExitedTrigger", any).Invoke(zone, new object[] { body });
+            }
+            catch (TargetInvocationException e) { laundryResult = item.name + ": " + e.InnerException.GetType().Name; item.transform.parent = before; return false; }
+            bool moved = item.transform.parent != unparent.transform;
+            laundryResult = item.name + " left " + unparent.name + ", now under " + (item.transform.parent != null ? item.transform.parent.name : "the scene");
+            item.transform.parent = before;
+            return moved;
+        }
+
         IEnumerator GarageHost()
         {
             RigHead = new Vector3(0.2f, 1.35f, -0.6f); RigYaw = 0;
@@ -138,6 +168,7 @@ namespace RickAndMortyTogether
             int holding;
             string hold = PointsHold(ComputerPoints(out computer), out holding);
             Check("garage.client.repaired", holding == points.Length && SpawnsRemoved == removedAtStart && SpawnsCopied == copiedAtStart, hold + ", copied by the mod " + (SpawnsCopied - copiedAtStart) + ", removed " + (SpawnsRemoved - removedAtStart));
+            Check("garage.client.laundry", LeaveLaundryZone(), laundryResult);
             Check("garage.client.errors", errorCount == errorsAtStart, (errorCount - errorsAtStart) + " game errors since the copy");
             Check("tour.done", tourFailure == null, "garage");
         }

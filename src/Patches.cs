@@ -1,4 +1,5 @@
 using HarmonyLib;
+using OwlchemyVR;
 
 namespace RickAndMortyTogether
 {
@@ -31,6 +32,23 @@ namespace RickAndMortyTogether
         {
             if (!TogetherRuntime.LabMode) return true;
             __result = null;   // a fresh game in every lab copy
+            return false;
+        }
+    }
+
+    // The laundry zone puts an item that leaves it while still its child back under OwlchemyVRStorage.LevelController,
+    // which nothing sets any more (deprecated for SceneController): a NullReferenceException that stops the zone's other
+    // listeners. Put it under the scene's transient root instead, as the basket's own DropLaundry does.
+    [HarmonyPatch(typeof(UnpartentOnExitItemCollectionZone), "Removed")]
+    static class UnparentOnExitPatch
+    {
+        static bool Prefix(UnpartentOnExitItemCollectionZone __instance, PickupableItem item)
+        {
+            if (item == null || item.transform.parent != __instance.transform || OwlchemyVRStorage.Instance.LevelController != null) return true;
+            TogetherRuntime rt = TogetherRuntime.Instance;
+            TogetherRuntime.Log("Laundry: " + item.name + " left " + __instance.name + " while its child (synced id " + (rt != null ? rt.ItemIdOf(item) : 0u) + ")");
+            if (TogetherRuntime.Mutant("nolaundryunparent")) return true;
+            item.transform.parent = item.gameObject.GetTransientSceneRoot();
             return false;
         }
     }

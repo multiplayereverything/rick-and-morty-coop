@@ -2,7 +2,8 @@
 
 ## State (2026-10-29, 0.7.1, protocol 7)
 
-- Garage spawners: the computer's parts (tour `garage`); attached parts the game made stay each copy's own.
+- Garage spawners: the computer's parts (tour `garage`); attached parts the game made stay each copy's own. The
+  client's laundry zone error is fixed (`UnparentOnExitPatch`, step `garage.client.laundry`).
 
 - Late joiners skip openings, characters look at the nearest player, flat-mode teleport works, slow-machine spawn
   matching (tours `latejoin`, `flat`, `spawns`). Real-player checks: `docs/PLAYTEST.md`.
@@ -38,10 +39,10 @@
    `garage`, checks `garage.*.start`). Not reproduced; waiting for the user to say where each Morty was. VR-only
    differences: the room-size layout (`PlayspacePositionalOffset`) offsets a headset player from the pad, and the start
    teleport only fires if no pad is current when the new pads register.
-0b. **Client-only game error during the laundry banter** (`DoMyLaundry` / `DumpLaundry`): items leaving the laundry
-   collection zone on the client raise NullReferenceException in `UnpartentOnExitItemCollectionZone.Removed` (3 at
-   once; the host has none). Also seen in a 0.7.0 `latejoin` run. Find which of `item` and
-   `OwlchemyVRStorage.Instance.LevelController` is null on the client.
+0b. **Spectator camera copy errors:** `Avatar.Inert` on the spectator camera prefab logs "Can't remove AudioImpactController
+   / WorldItem / InteractableItem ... depends on it" (host in `garage`, client in `spectator`): removing scripts last
+   first is not enough there, so those scripts stay on the copy. Remove them in passes, skipping one another remaining
+   script requires (`RequireComponent`), with a mutant and an errors check in `spectator`.
 1. **Attachments:** putting a part into the computer (or any attach point) is not synced; a part pulled out becomes
    synced. Watch the FixComputerTask with two players. Combinator results and the laundry (stage LaundryTask) are
    still unchecked in the lab.

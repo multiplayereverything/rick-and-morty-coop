@@ -20,6 +20,12 @@ story repairs it). Same protocol as 0.7.0.
 - **Fix:** copying a game object for a remote player (Morty head, spectator camera) removed its scripts in an order
   Unity refuses ("Can't remove TextContainer because TextMeshPro depends on it", a game error on the client). They are
   removed last first now.
+- **Fix:** a game error on the client during the laundry banter (`DumpLaundry`): the laundry spawner's zone
+  (`UnpartentOnExitItemCollectionZone` on `LaundrySpawners`, which parents the laundry it makes) puts an item that leaves
+  it while still its child back under `OwlchemyVRStorage.LevelController`, which the game never sets any more
+  (deprecated), so it threw a NullReferenceException, 3 at once, and stopped the zone's other listeners. A client's
+  copies, following the host's laundry, leave while still children; the host's own normally don't. Such an item now goes
+  under the scene's transient root, as the basket's own `DropLaundry` does. Mutant `nolaundryunparent`.
 - **Decision:** a part a player pulls out of the computer becomes a synced item from then on; putting a part into the
   computer is not synced (each copy's attach points are its own). Listed in Known limits.
 - **Lab:** where the game starts a player after a scene load (the first pad on `TeleportationController`'s
@@ -32,6 +38,12 @@ story repairs it). Same protocol as 0.7.0.
     prefab; the client, with none out, gets a copy. Both repair the computer (the client 4 s later): each holds its own
     working parts, nothing copied or removed by the mod, no game errors after the scene load.
   - Mutants `nospawntemplate`, `noattachwait`: each caught by `garage`.
+  - `garage` laundry step (`garage.client.laundry`): on the client an item is put in the laundry zone as its child and
+    the zone's own trigger handlers see it leave: PASS (now under `TransientRoot`); with `nolaundryunparent` it throws
+    the NullReferenceException (CAUGHT). The earlier `garage` run without the fix had failed `garage.client.errors` on
+    the 3 laundry errors; the run with it passed 7/7 on the client.
+  - Still open: the host's copy of the spectator camera logs 3 "Can't remove ... depends on it" errors (`WorldItem`,
+    `InteractableItem`), so last-first is not enough for every object (handoff item 0b).
   - `spectator`: PASS, no TextContainer error.
   - `spawns`, `handoff`, `boss`: PASS (one `spawns` run failed while the host ran at 14 fps with a 4 s stall; the rerun
     passed).
