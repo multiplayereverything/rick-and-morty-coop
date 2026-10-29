@@ -111,6 +111,10 @@ namespace RickAndMortyTogether
                 // Nothing like it here yet: a slow copy may still be making its own. Wait for it (up to 30 s) rather than
                 // drop the announcement and then remove this copy's own as one only it made.
                 if (template == null && now - h.At < WaitForOwn && !Mutant("nospawnwait")) continue;
+                // Still none in the scene (something only the host's game swapped in, like the computer's working parts):
+                // copy a loaded one that is not out, a prefab included.
+                if (template == null && !Mutant("nospawntemplate"))
+                    foreach (GrabbableItem g in Resources.FindObjectsOfTypeAll<GrabbableItem>()) if (BaseName(g.name) == h.Name) { template = g; break; }
                 hostSpawns.RemoveAt(i);
                 if (template == null) { Log("Spawn " + h.Name + ": nothing like it here to copy"); continue; }
                 GameObject copy = (GameObject)Object.Instantiate(template.gameObject, h.Position, h.Rotation);

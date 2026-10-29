@@ -2,6 +2,36 @@
 
 Newest first. Each entry: what changed, why, and how it was tested. Decisions made without asking are marked **Decision**.
 
+## 0.7.1 (2026-10-29, protocol 7)
+
+The garage's own spawners checked in the lab: the computer's parts, made by the game's
+`BrainControlledModule_Computer.SpawnAndAttachComputerParts` (broken ones when the garage loads, working ones when the
+story repairs it). Same protocol as 0.7.0.
+
+- **Fix:** a part the game made and attached (RAM stick, crystal, fuse in the computer) was registered or not depending
+  on whether its rigidbody happened to be on, so the copies registered different parts. A client then removed its own
+  attached parts as "made only here", and the game's next repair tripped over the destroyed part
+  (NullReferenceException in `AttachableItem.Detach`). Attached parts the game made now stay each copy's own (both
+  games make and attach them, through the shared story) and are registered once loose. Mutant `noattachwait`.
+- **Fix:** something only the host's game made, with nothing of that name out on the client (the working parts when
+  the client's stage came from the host's snapshot), was dropped ("nothing like it here to copy"). After the 30 s wait
+  for the client's own, it is now copied from a loaded one that is not out, a prefab included. Mutant
+  `nospawntemplate`.
+- **Fix:** copying a game object for a remote player (Morty head, spectator camera) removed its scripts in an order
+  Unity refuses ("Can't remove TextContainer because TextMeshPro depends on it", a game error on the client). They are
+  removed last first now.
+- **Decision:** a part a player pulls out of the computer becomes a synced item from then on; putting a part into the
+  computer is not synced (each copy's attach points are its own). Listed in Known limits.
+- **Not a mod issue:** two lab runs had one copy freeze for 20-45 s with no error (shared lab PC); reruns passed.
+- **Tested** (`artifacts/tests/`):
+  - `garage` tour (new): PASS, 5/5 checks on each copy. The host's game makes a loose working RAM stick from the part's
+    prefab; the client, with none out, gets a copy. Both repair the computer (the client 4 s later): each holds its own
+    working parts, nothing copied or removed by the mod, no game errors after the scene load.
+  - Mutants `nospawntemplate`, `noattachwait`: each caught by `garage`.
+  - `spectator`: PASS, no TextContainer error.
+  - `spawns`, `handoff`, `boss`: PASS (one `spawns` run failed while the host ran at 14 fps with a 4 s stall; the rerun
+    passed).
+
 ## 0.7.0 (2026-10-28, protocol 7)
 
 Late joiners, characters looking at the nearest player, flat-screen teleporting, and slow machines.

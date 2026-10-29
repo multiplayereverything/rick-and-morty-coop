@@ -4,7 +4,7 @@ Co-op for **Rick and Morty: Virtual Rick-ality** (Steam, VR). Two players share 
 clones in the same garage, see each other's head and hands, and can pick things up, throw them and pass them from
 hand to hand.
 
-**Status: 0.7.0 pre-release.** Players, hands, grabbable items, doors, levers, sliders, buttons, the story, level
+**Status: 0.7.1 pre-release.** Players, hands, grabbable items, doors, levers, sliders, buttons, the story, level
 changes, and Rick's and Morty's lines and animations are shared, with the host's game in charge (see
 [What is shared](#what-is-shared)). Things the game makes or destroys while you play are shared too.
 
@@ -85,6 +85,8 @@ Remove the launch option to play in VR again.
   the Steam lobby flow are tested.
 - Joining a scene the host has been in a while skips its opening lines for you, but the characters' timed banter
   runs a little behind the host's until the next story event.
+- Putting a part into something (the computer's RAM stick, crystal and fuse) happens on your side only; pulling a
+  part out is shared.
 - Not yet checked with real headsets on two Steam accounts or with a real keyboard and mouse: see
   `docs/PLAYTEST.md` for the 15-minute checks.
 

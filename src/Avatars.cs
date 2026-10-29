@@ -47,7 +47,10 @@ namespace RickAndMortyTogether
             GameObject holder = new GameObject("RickAndMortyTogether Copy");
             holder.SetActive(false);
             GameObject copy = (GameObject)UnityEngine.Object.Instantiate(source, holder.transform);
-            foreach (MonoBehaviour b in copy.GetComponentsInChildren<MonoBehaviour>(true)) UnityEngine.Object.DestroyImmediate(b);
+            // Last first: a script that requires another (TextMeshPro needs its TextContainer) was added after it, and Unity
+            // refuses to remove the required one while the other is still there.
+            MonoBehaviour[] scripts = copy.GetComponentsInChildren<MonoBehaviour>(true);
+            for (int i = scripts.Length - 1; i >= 0; i--) UnityEngine.Object.DestroyImmediate(scripts[i]);
             foreach (Joint j in copy.GetComponentsInChildren<Joint>(true)) UnityEngine.Object.DestroyImmediate(j);
             foreach (Collider c in copy.GetComponentsInChildren<Collider>(true)) UnityEngine.Object.DestroyImmediate(c);
             foreach (Rigidbody r in copy.GetComponentsInChildren<Rigidbody>(true)) UnityEngine.Object.DestroyImmediate(r);

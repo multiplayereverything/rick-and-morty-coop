@@ -35,6 +35,7 @@ $tours = @{
         'play.client.EggShootOut@c1', 'play.client.Bathroom@c1', 'play.client.PetriDish@c1', 'play.client.Troy@c1', 'play.client.Satellite@c1', 'play.client.home@c1', 'tour.done') }
     'boss' = @{ Seconds = 800; Expect = @('boss.host.on@host', 'boss.host.states@host', 'boss.client.states@c1', 'boss.client.held@c1', 'tour.done') }
     'latejoin' = @{ Seconds = 800; ClientArgs = '-rt-join-after 60'; Expect = @('latejoin.host.look@host', 'latejoin.client.muted@c1', 'latejoin.client.look@c1', 'tour.done') }
+    'garage' = @{ Seconds = 400; Expect = @('garage.host.loose@host', 'garage.host.repaired@host', 'garage.client.loose@c1', 'garage.client.repaired@c1', 'garage.client.errors@c1', 'tour.done') }
     'spawns' = @{ Seconds = 200; Expect = @(
         'spawns.host.announced@host', 'spawns.host.despawned@host', 'spawns.host.one@host',
         'spawns.client.copied@c1', 'spawns.client.adopted@c1', 'spawns.client.removed@c1', 'spawns.client.despawned@c1', 'spawns.client.late@c1', 'tour.done') }

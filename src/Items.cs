@@ -77,6 +77,12 @@ namespace RickAndMortyTogether
         // Grabbables that are not synced (no body, someone's own, a duplicate path): not looked at again.
         readonly HashSet<GrabbableItem> passedOver = new HashSet<GrabbableItem>();
 
+        static bool AttachedPart(GrabbableItem grab)
+        {
+            AttachableItem part = grab.GetComponent<AttachableItem>();
+            return part != null && part.CurrentlyAttachedTo != null;
+        }
+
         void ScanItems() { ScanItems(UnityEngine.Object.FindObjectsOfType<GrabbableItem>(), true); }
 
         void ScanItems(IList<GrabbableItem> found, bool full)
@@ -87,6 +93,9 @@ namespace RickAndMortyTogether
             foreach (GrabbableItem grab in found)
             {
                 if (grab == null || itemOf.ContainsKey(grab) || passedOver.Contains(grab)) continue;
+                // A part the game made and attached (the computer's RAM stick, crystal, fuse) is made and attached by the game on
+                // every copy, but whether its rigidbody is on at this moment differs: look again once it is loose.
+                if (IsSpawned(grab.transform) && AttachedPart(grab) && !Mutant("noattachwait")) continue;
                 Rigidbody body = grab.GetComponent<Rigidbody>();
                 LimitedIndirectGrabbableController control = grab.GetComponent<LimitedIndirectGrabbableController>();
                 if (body == null && control == null) { passedOver.Add(grab); continue; }

@@ -1,6 +1,8 @@
 # Handoff
 
-## State (2026-10-28, 0.7.0, protocol 7)
+## State (2026-10-29, 0.7.1, protocol 7)
+
+- Garage spawners: the computer's parts (tour `garage`); attached parts the game made stay each copy's own.
 
 - Late joiners skip openings, characters look at the nearest player, flat-mode teleport works, slow-machine spawn
   matching (tours `latejoin`, `flat`, `spawns`). Real-player checks: `docs/PLAYTEST.md`.
@@ -29,8 +31,12 @@
 
 ## Next, in order
 
-1. **Spawns in real play:** the `spawns` tour makes items with `Object.Instantiate`; watch a real combinator,
-   dispenser and the laundry in the garage (a garage tour) for names or places that don't match.
+0. **User report (2026-10-29, real play, screenshot from the spectator view):** in the starting intro, both Mortys are
+   not at the location the intro puts the player. Check where each copy's rig starts in the intro (the intro's start
+   pad / play-space origin) and where the remote Morty is drawn; the intro may have one player spot for two players.
+1. **Attachments:** putting a part into the computer (or any attach point) is not synced; a part pulled out becomes
+   synced. Watch the FixComputerTask with two players. Combinator results and the laundry (stage LaundryTask) are
+   still unchecked in the lab.
 2. **Mid-scene join, rest:** the joiner's timed banter trails the host's until the next shared story event; copy the
    Brain's running nodes if players notice.
 3. **Real headset check of the fade path** (the lab loads without the fade).
