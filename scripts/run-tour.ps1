@@ -22,7 +22,7 @@ $tours = @{
         'tour.done') }
     'spectator' = @{ Seconds = 200; Expect = @(
         'spectator.host.on@host', 'spectator.host.camera@host', 'spectator.host.watch@host', 'spectator.host.back@host',
-        'spectator.client.sees.on@c1', 'spectator.client.sees.camera@c1', 'spectator.client.sees.off@c1', 'tour.done') }
+        'spectator.client.sees.on@c1', 'spectator.client.sees.camera@c1', 'spectator.client.inert@c1', 'spectator.client.sees.off@c1', 'tour.done') }
     'flat' = @{ Seconds = 600; HostArgs = '-rt-flat'; Expect = @(
         'flat.on@host', 'flat.look@host', 'flat.walk@host', 'flat.grab@host', 'flat.buttons@host', 'flat.teleport@host',
         'flat.client.sees.grab@c1', 'tour.done') }

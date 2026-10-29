@@ -68,9 +68,12 @@ namespace RickAndMortyTogether
             if (tourFailure != null) yield break;
             Check("spectator.client.sees.on", true, "host is spectating");
             Peer host = FirstPeer();
+            int errorsAtStart = errorCount;
             yield return StartCoroutine(Wait(() => host.Pose.CameraShown && host.Avatar.Camera != null && host.Avatar.Camera.gameObject.activeInHierarchy && (host.Avatar.Camera.position - host.Pose.CameraPosition).magnitude < 0.1f, 60, "spectator.client.sees.camera", () => "camera shown " + host.Pose.CameraShown + ", copy " + (host.Avatar.Camera != null)));
             if (tourFailure != null) yield break;
             Check("spectator.client.sees.camera", true, "host's spectator camera here at " + V(host.Avatar.Camera.position) + " (" + host.Avatar.Camera.GetComponentsInChildren<Renderer>().Length + " renderers)");
+            int scriptsLeft = host.Avatar.Camera.GetComponentsInChildren<MonoBehaviour>(true).Length;
+            Check("spectator.client.inert", scriptsLeft == 0 && errorCount == errorsAtStart, scriptsLeft + " game scripts left on the copy, " + (errorCount - errorsAtStart) + " game errors while making it");
             string file = System.IO.Path.Combine(Root, "spectator-c1.png");
             yield return StartCoroutine(Pause(1));
             Application.CaptureScreenshot(file, 3);

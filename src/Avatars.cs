@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using OwlchemyVR;
 using UnityEngine;
 
@@ -47,10 +48,19 @@ namespace RickAndMortyTogether
             GameObject holder = new GameObject("RickAndMortyTogether Copy");
             holder.SetActive(false);
             GameObject copy = (GameObject)UnityEngine.Object.Instantiate(source, holder.transform);
-            // Last first: a script that requires another (TextMeshPro needs its TextContainer) was added after it, and Unity
-            // refuses to remove the required one while the other is still there.
-            MonoBehaviour[] scripts = copy.GetComponentsInChildren<MonoBehaviour>(true);
-            for (int i = scripts.Length - 1; i >= 0; i--) UnityEngine.Object.DestroyImmediate(scripts[i]);
+            // Unity refuses to remove a script another one still there requires (TextMeshPro needs its TextContainer,
+            // PickupableItem its InteractableItem), and component order does not follow those needs: remove in passes,
+            // each taking the scripts nothing left requires.
+            List<MonoBehaviour> scripts = new List<MonoBehaviour>(copy.GetComponentsInChildren<MonoBehaviour>(true));
+            if (TogetherRuntime.Mutant("noinertorder")) scripts.Reverse();
+            while (scripts.Count > 0)
+            {
+                List<MonoBehaviour> free = TogetherRuntime.Mutant("noinertorder") ? scripts : scripts.FindAll(s => !Required(s, scripts));
+                if (free.Count == 0) free = scripts;   // a cycle: remove them anyway
+                foreach (MonoBehaviour script in free) UnityEngine.Object.DestroyImmediate(script);
+                scripts.RemoveAll(s => s == null);
+                if (free == scripts) break;
+            }
             foreach (Joint j in copy.GetComponentsInChildren<Joint>(true)) UnityEngine.Object.DestroyImmediate(j);
             foreach (Collider c in copy.GetComponentsInChildren<Collider>(true)) UnityEngine.Object.DestroyImmediate(c);
             foreach (Rigidbody r in copy.GetComponentsInChildren<Rigidbody>(true)) UnityEngine.Object.DestroyImmediate(r);
@@ -59,6 +69,19 @@ namespace RickAndMortyTogether
             copy.transform.SetParent(null, false);
             UnityEngine.Object.DestroyImmediate(holder);
             return copy;
+        }
+
+        // Whether another script on the same object still needs this one (a RequireComponent of its class or a base class).
+        static bool Required(MonoBehaviour script, List<MonoBehaviour> left)
+        {
+            foreach (MonoBehaviour other in left)
+            {
+                if (other == script || other == null || other.gameObject != script.gameObject) continue;
+                foreach (RequireComponent r in other.GetType().GetCustomAttributes(typeof(RequireComponent), true))
+                    foreach (Type t in new[] { r.m_Type0, r.m_Type1, r.m_Type2 })
+                        if (t != null && t.IsAssignableFrom(script.GetType())) return true;
+            }
+            return false;
         }
 
         Transform MakeHead(MasterHMDAndInputController m)

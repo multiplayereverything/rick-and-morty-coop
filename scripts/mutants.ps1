@@ -28,6 +28,7 @@ $mutants = [ordered]@{
     'noattachwait' = 'garage' # a client registers its own attached computer parts and removes them as made only here
     'nocause'   = 'story'     # story events are neither sent by the host nor held back on clients
     'nospectatorview' = 'spectator'  # cycling spectator cameras never visits the other players' views
+    'noinertorder' = 'spectator'  # copying the spectator camera leaves game scripts on it (removed in an order Unity refuses)
     'nostage'   = 'story'     # clients ignore the host's progression stage
     'noarea'    = 'story'     # clients do not mirror the host's garage areas
     'noscenefollow' = 'story' # clients neither follow the host's scene loads nor hold their own back

@@ -17,9 +17,11 @@ story repairs it). Same protocol as 0.7.0.
   the client's stage came from the host's snapshot), was dropped ("nothing like it here to copy"). After the 30 s wait
   for the client's own, it is now copied from a loaded one that is not out, a prefab included. Mutant
   `nospawntemplate`.
-- **Fix:** copying a game object for a remote player (Morty head, spectator camera) removed its scripts in an order
-  Unity refuses ("Can't remove TextContainer because TextMeshPro depends on it", a game error on the client). They are
-  removed last first now.
+- **Fix:** copying a game object for a remote player (Morty head, hands, spectator camera) removed its scripts in an
+  order Unity refuses ("Can't remove TextContainer because TextMeshPro depends on it"; on the spectator camera
+  "Can't remove InteractableItem because PickupableItem depends on it"), a game error each, and the refused scripts
+  stayed on the copy. They are now removed in passes, each taking the scripts no other script left on the object
+  requires (`RequireComponent`). Mutant `noinertorder`.
 - **Fix:** a game error on the client during the laundry banter (`DumpLaundry`): the laundry spawner's zone
   (`UnpartentOnExitItemCollectionZone` on `LaundrySpawners`, which parents the laundry it makes) puts an item that leaves
   it while still its child back under `OwlchemyVRStorage.LevelController`, which the game never sets any more
@@ -42,9 +44,9 @@ story repairs it). Same protocol as 0.7.0.
     the zone's own trigger handlers see it leave: PASS (now under `TransientRoot`); with `nolaundryunparent` it throws
     the NullReferenceException (CAUGHT). The earlier `garage` run without the fix had failed `garage.client.errors` on
     the 3 laundry errors; the run with it passed 7/7 on the client.
-  - Still open: the host's copy of the spectator camera logs 3 "Can't remove ... depends on it" errors (`WorldItem`,
-    `InteractableItem`), so last-first is not enough for every object (handoff item 0b).
-  - `spectator`: PASS, no TextContainer error.
+  - `spectator` (new check `spectator.client.inert`): PASS, the client's copy of the host's spectator camera has 0
+    game scripts left and made 0 game errors; with `noinertorder` (last first, the earlier order) 3 scripts stay and 3
+    errors are logged (CAUGHT).
   - `spawns`, `handoff`, `boss`: PASS (one `spawns` run failed while the host ran at 14 fps with a 4 s stall; the rerun
     passed).
 

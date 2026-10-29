@@ -39,10 +39,6 @@
    `garage`, checks `garage.*.start`). Not reproduced; waiting for the user to say where each Morty was. VR-only
    differences: the room-size layout (`PlayspacePositionalOffset`) offsets a headset player from the pad, and the start
    teleport only fires if no pad is current when the new pads register.
-0b. **Spectator camera copy errors:** `Avatar.Inert` on the spectator camera prefab logs "Can't remove AudioImpactController
-   / WorldItem / InteractableItem ... depends on it" (host in `garage`, client in `spectator`): removing scripts last
-   first is not enough there, so those scripts stay on the copy. Remove them in passes, skipping one another remaining
-   script requires (`RequireComponent`), with a mutant and an errors check in `spectator`.
 1. **Attachments:** putting a part into the computer (or any attach point) is not synced; a part pulled out becomes
    synced. Watch the FixComputerTask with two players. Combinator results and the laundry (stage LaundryTask) are
    still unchecked in the lab.
