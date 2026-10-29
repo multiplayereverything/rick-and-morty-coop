@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using OwlchemyVR;
+using OwlchemyVR.Teleportation;
 using UnityEngine;
 
 namespace RickAndMortyTogether
@@ -52,6 +53,31 @@ namespace RickAndMortyTogether
             return n;
         }
 
+        // The pad the game starts a player on in this scene: the first of its start pads (TeleportationController's
+        // initialZoneDatas) that is a pad here.
+        static string StartPad()
+        {
+            TeleportationController tc = GlobalStorage.Instance.TeleportationController;
+            UniqueObjectData[] initial = (UniqueObjectData[])typeof(TeleportationController).GetField("initialZoneDatas", AnyField).GetValue(tc);
+            foreach (TeleportZone z in Object.FindObjectsOfType<TeleportZone>())
+                foreach (UniqueObjectData d in initial) if (d != null && z.UniqueObjectData == d) return d.name;
+            return "none";
+        }
+
+        static string PadHere()
+        {
+            TeleportZone z = GlobalStorage.Instance.TeleportationController.CurrentZone;
+            return z != null && z.UniqueObjectData != null ? z.UniqueObjectData.name : "none";
+        }
+
+        IEnumerator OnStartPad(string check)
+        {
+            yield return StartCoroutine(Wait(() => PadHere() != "none" && StartPad() != "none", 30, check, "no pad yet"));
+            if (tourFailure != null) yield break;
+            yield return StartCoroutine(Pause(5));   // after the mod's own area and zone following has run
+            Check(check, PadHere() == StartPad(), "on " + PadHere() + ", the game's start pad here is " + StartPad());
+        }
+
         IEnumerator GarageHost()
         {
             RigHead = new Vector3(0.2f, 1.35f, -0.6f); RigYaw = 0;
@@ -62,6 +88,8 @@ namespace RickAndMortyTogether
             if (tourFailure != null) yield break;
             BrainControlledModule_Computer computer = null; System.Array points = null;
             yield return StartCoroutine(Wait(() => (points = ComputerPoints(out computer)) != null, 60, "garage.host.loose", "no computer in the garage"));
+            LogGarage();
+            StartCoroutine(OnStartPad("garage.host.start"));
             if (tourFailure != null) yield break;
             // 1. Only the host's game makes it.
             AttachableItem ram = PointField<AttachableItem>(points.GetValue(1), "workingPart");
@@ -91,6 +119,8 @@ namespace RickAndMortyTogether
             BrainControlledModule_Computer computer = null; System.Array points = null;
             yield return StartCoroutine(Wait(() => (points = ComputerPoints(out computer)) != null, 60, "garage.client.loose", "no computer in the garage"));
             if (tourFailure != null) yield break;
+            LogGarage();
+            StartCoroutine(OnStartPad("garage.client.start"));
             string ram = PointField<AttachableItem>(points.GetValue(1), "workingPart").name;
             int removedAtStart = SpawnsRemoved;
             // 1. The host's loose part (a copy waits up to 30 s for this game's own before using the prefab).

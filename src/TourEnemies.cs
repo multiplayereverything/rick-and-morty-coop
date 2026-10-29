@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using OwlchemyVR;
 using OwlchemyVR.SceneManagement;
@@ -30,6 +31,12 @@ namespace RickAndMortyTogether
             Log(s.ToString());
             foreach (TeleportZone z in Resources.FindObjectsOfTypeAll<TeleportZone>())
                 if (z.gameObject.scene.isLoaded) Log("RT-SURVEY pad " + z.gameObject.scene.name + " " + z.name + " " + (z.UniqueObjectData != null ? z.UniqueObjectData.name : "-") + " at " + V(z.transform.position));
+            // The pads the game starts a player on (the first of these to register after a scene load) and where it put us.
+            TeleportationController tc = GlobalStorage.Instance.TeleportationController;
+            UniqueObjectData[] initial = (UniqueObjectData[])typeof(TeleportationController).GetField("initialZoneDatas", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(tc);
+            List<string> names = new List<string>();
+            foreach (UniqueObjectData d in initial) names.Add(d != null ? d.name : "-");
+            Log("RT-SURVEY start pads: " + string.Join(", ", names.ToArray()) + "; on " + (tc.CurrentZone != null ? tc.CurrentZone.name : "none") + ", stage " + CurrentStageName());
         }
 
         int EnemiesOutHere(bool aliveOnly)

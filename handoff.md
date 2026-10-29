@@ -31,9 +31,17 @@
 
 ## Next, in order
 
-0. **User report (2026-10-29, real play, screenshot from the spectator view):** in the starting intro, both Mortys are
-   not at the location the intro puts the player. Check where each copy's rig starts in the intro (the intro's start
-   pad / play-space origin) and where the remote Morty is drawn; the intro may have one player spot for two players.
+0. **User report (2026-10-29, real play):** in the starting intro both Mortys were not where the intro puts the player.
+   The game's rule (`TeleportationController.RegisterTeleportZone`): after a scene load, the first pad on
+   `initialZoneDatas` (`TeleportZone_GarageLaundry`, `TeleportZone_LivingRoom`) becomes the player's pad; in the garage
+   intro (stage `LaundryTask`) that is the laundry pad at (0.49, 0, -3.05). In the lab both copies land there (tour
+   `garage`, checks `garage.*.start`). Not reproduced; waiting for the user to say where each Morty was. VR-only
+   differences: the room-size layout (`PlayspacePositionalOffset`) offsets a headset player from the pad, and the start
+   teleport only fires if no pad is current when the new pads register.
+0b. **Client-only game error during the laundry banter** (`DoMyLaundry` / `DumpLaundry`): items leaving the laundry
+   collection zone on the client raise NullReferenceException in `UnpartentOnExitItemCollectionZone.Removed` (3 at
+   once; the host has none). Also seen in a 0.7.0 `latejoin` run. Find which of `item` and
+   `OwlchemyVRStorage.Instance.LevelController` is null on the client.
 1. **Attachments:** putting a part into the computer (or any attach point) is not synced; a part pulled out becomes
    synced. Watch the FixComputerTask with two players. Combinator results and the laundry (stage LaundryTask) are
    still unchecked in the lab.

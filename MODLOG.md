@@ -22,6 +22,10 @@ story repairs it). Same protocol as 0.7.0.
   removed last first now.
 - **Decision:** a part a player pulls out of the computer becomes a synced item from then on; putting a part into the
   computer is not synced (each copy's attach points are its own). Listed in Known limits.
+- **Lab:** where the game starts a player after a scene load (the first pad on `TeleportationController`'s
+  `initialZoneDatas`, the laundry pad for the garage intro) is logged by `LogGarage` and checked on both copies in the
+  `garage` tour (`garage.host.start`, `garage.client.start`: PASS, both on `TeleportZone_GarageLaundry`). Checked for
+  the user's report that both Mortys started away from the intro's spot; not reproduced in the lab.
 - **Not a mod issue:** two lab runs had one copy freeze for 20-45 s with no error (shared lab PC); reruns passed.
 - **Tested** (`artifacts/tests/`):
   - `garage` tour (new): PASS, 5/5 checks on each copy. The host's game makes a loose working RAM stick from the part's
