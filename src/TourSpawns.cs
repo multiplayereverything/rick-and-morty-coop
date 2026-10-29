@@ -12,7 +12,7 @@ namespace RickAndMortyTogether
     // 4. the host destroys the first one: it goes on the client too.
     public sealed partial class TogetherRuntime
     {
-        static readonly Vector3 SpawnA = new Vector3(0.2f, 0.6f, -0.3f), SpawnB = new Vector3(0.9f, 0.6f, -0.3f), SpawnC = new Vector3(1.6f, 0.6f, -0.3f);   // process-scoped (constants)
+        static readonly Vector3 SpawnA = new Vector3(0.2f, 0.6f, -0.3f), SpawnB = new Vector3(0.9f, 0.6f, -0.3f), SpawnC = new Vector3(1.6f, 0.6f, -0.3f), SpawnD = new Vector3(0.9f, 0.6f, 0.3f);   // process-scoped (constants)
 
         GameObject MakeLikeComic(Vector3 at)
         {
@@ -57,6 +57,9 @@ namespace RickAndMortyTogether
             float t4 = t2 + 20;
             yield return StartCoroutine(UntilHostTime(t4));
             Object.Destroy(a);
+            // 5. Something the client has nothing like yet; its own copy comes 8 s later (a slow machine).
+            yield return StartCoroutine(UntilHostTime(t2 + 30));
+            GameObject w = MakeLikeComic(SpawnD); w.name = "LabWidget(Clone)";
             yield return StartCoroutine(Pause(1.5f));
             Check("spawns.host.despawned", Despawns >= 1, "despawns sent " + Despawns);
             Check("spawns.host.one", ComicsNear(SpawnB) == 1, ComicsNear(SpawnB) + " made comics at the shared spot here");
@@ -89,6 +92,14 @@ namespace RickAndMortyTogether
             yield return StartCoroutine(Wait(() => ComicsNear(SpawnA) == 0, 30, "spawns.client.despawned", () => ComicsNear(SpawnA) + " still at the first spot"));
             if (tourFailure != null) yield break;
             Check("spawns.client.despawned", Despawns >= 1, "removed after the host destroyed it");
+            // 5. The host's LabWidget arrives first; this copy makes its own 8 s later: it must be kept and adopted.
+            yield return StartCoroutine(UntilHostTime(t2 + 38));
+            int adopted = SpawnsAdopted;
+            GameObject w = MakeLikeComic(SpawnD + new Vector3(0.05f, 0, 0)); w.name = "LabWidget(Clone)";
+            yield return StartCoroutine(Pause(AdoptWindow + 3));
+            int widgets = 0;
+            foreach (GrabbableItem g in Object.FindObjectsOfType<GrabbableItem>()) if (BaseName(g.name) == "LabWidget") widgets++;
+            Check("spawns.client.late", SpawnsAdopted > adopted && widgets == 1, "own copy made 8 s after the host's: adopted " + (SpawnsAdopted - adopted) + ", " + widgets + " here");
             yield return StartCoroutine(Pause(4));
             Check("tour.done", tourFailure == null, "spawns");
         }

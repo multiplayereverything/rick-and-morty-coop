@@ -1,6 +1,9 @@
 # Handoff
 
-## State (2026-10-28, 0.6.0, protocol 6)
+## State (2026-10-28, 0.7.0, protocol 7)
+
+- Late joiners skip openings, characters look at the nearest player, flat-mode teleport works, slow-machine spawn
+  matching (tours `latejoin`, `flat`, `spawns`). Real-player checks: `docs/PLAYTEST.md`.
 
 - Enemies (`src/Enemies.cs`, tour `enemies`), per-player death (`src/Story.cs`, tour `death`), final boss state
   (`src/Boss.cs`, tour `boss`), every mission area played through together (tour `playthrough`).
@@ -28,9 +31,10 @@
 
 1. **Spawns in real play:** the `spawns` tour makes items with `Object.Instantiate`; watch a real combinator,
    dispenser and the laundry in the garage (a garage tour) for names or places that don't match.
-2. **Mid-scene join:** a late joiner replays the scene's opening; send the Brain's running nodes or skip openings.
+2. **Mid-scene join, rest:** the joiner's timed banter trails the host's until the next shared story event; copy the
+   Brain's running nodes if players notice.
 3. **Real headset check of the fade path** (the lab loads without the fade).
-4. **NPC look-at / enemies:** retarget to the nearest player (`RickAnimationEventController`, `EnemyController`).
+4. **Enemies in real play:** mirrored enemies and nearest-player aim checked only in the lab.
 5. Friends' lobbies in the browser (Steam friends' game info), two-account Steam P2P test.
 
 ## Needs the user (headset, two accounts)

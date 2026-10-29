@@ -21,7 +21,7 @@ namespace RickAndMortyTogether
         sealed class LocalSpawn { public GrabbableItem Grab; public string Name; public float Seen; }
         sealed class HostSpawn { public uint Id; public string Name; public Vector3 Position; public Quaternion Rotation; public float At; }
 
-        const float AdoptRange = 1.5f, AdoptWindow = 3f, CopyAfter = 2f;
+        const float AdoptRange = 1.5f, AdoptWindow = 3f, CopyAfter = 2f, WaitForOwn = 30f;
         readonly List<LocalSpawn> localSpawns = new List<LocalSpawn>();
         readonly List<HostSpawn> hostSpawns = new List<HostSpawn>();
         int spawnCounter;
@@ -93,7 +93,7 @@ namespace RickAndMortyTogether
                     foreach (LocalSpawn s in localSpawns)
                     {
                         float d = (s.Grab.transform.position - h.Position).magnitude;
-                        if (s.Name == h.Name && d < bestDistance && Mathf.Abs(s.Seen - h.At) < AdoptWindow + CopyAfter) { best = s; bestDistance = d; }
+                        if (s.Name == h.Name && d < bestDistance && s.Seen - h.At > -(AdoptWindow + CopyAfter)) { best = s; bestDistance = d; }
                     }
                 if (best != null)
                 {
@@ -108,6 +108,9 @@ namespace RickAndMortyTogether
                 // This copy did not make it: make one like it.
                 GrabbableItem template = null;
                 foreach (GrabbableItem g in Object.FindObjectsOfType<GrabbableItem>()) if (BaseName(g.name) == h.Name) { template = g; break; }
+                // Nothing like it here yet: a slow copy may still be making its own. Wait for it (up to 30 s) rather than
+                // drop the announcement and then remove this copy's own as one only it made.
+                if (template == null && now - h.At < WaitForOwn && !Mutant("nospawnwait")) continue;
                 hostSpawns.RemoveAt(i);
                 if (template == null) { Log("Spawn " + h.Name + ": nothing like it here to copy"); continue; }
                 GameObject copy = (GameObject)Object.Instantiate(template.gameObject, h.Position, h.Rotation);

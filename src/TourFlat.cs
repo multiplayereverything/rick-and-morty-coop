@@ -82,10 +82,15 @@ namespace RickAndMortyTogether
             // 5. Let go, then teleport to a pad in view if this room has another one.
             i.GrabRight = false;
             yield return StartCoroutine(Pause(1));
+            // The living room has one pad: teleport (T) is tried in the garage, which has several.
+            yield return StartCoroutine(IntoGarage("flat.teleport"));
+            if (tourFailure != null) yield break;
+            yield return StartCoroutine(Pause(5));
             List<TeleportZone> pads = FlatPads();
-            if (pads.Count == 0) Check("flat.teleport", true, "this room has no other teleport pad");
-            else
+            pads.RemoveAll(z => z.gameObject.scene.name != "RicksGarage");
+            if (pads.Count == 0) { tourFailure = "flat.teleport"; Check("flat.teleport", false, "no other pad in the garage"); yield break; }
             {
+                pads.Sort((x, y) => (x.transform.position - head.position).sqrMagnitude.CompareTo((y.transform.position - head.position).sqrMagnitude));
                 TeleportZone pad = pads[0];
                 for (int f = 0; f < 120; f++)
                 {

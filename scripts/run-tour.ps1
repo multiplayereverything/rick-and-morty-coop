@@ -23,7 +23,7 @@ $tours = @{
     'spectator' = @{ Seconds = 200; Expect = @(
         'spectator.host.on@host', 'spectator.host.camera@host', 'spectator.host.watch@host', 'spectator.host.back@host',
         'spectator.client.sees.on@c1', 'spectator.client.sees.camera@c1', 'spectator.client.sees.off@c1', 'tour.done') }
-    'flat' = @{ Seconds = 240; HostArgs = '-rt-flat'; Expect = @(
+    'flat' = @{ Seconds = 600; HostArgs = '-rt-flat'; Expect = @(
         'flat.on@host', 'flat.look@host', 'flat.walk@host', 'flat.grab@host', 'flat.buttons@host', 'flat.teleport@host',
         'flat.client.sees.grab@c1', 'tour.done') }
     'enemies' = @{ Seconds = 800; Expect = @(
@@ -34,9 +34,10 @@ $tours = @{
         'play.host.EggShootOut@host', 'play.host.sees.EggShootOut@host', 'play.host.Bathroom@host', 'play.host.sees.Bathroom@host', 'play.host.PetriDish@host', 'play.host.sees.PetriDish@host', 'play.host.Troy@host', 'play.host.sees.Troy@host', 'play.host.Satellite@host', 'play.host.sees.Satellite@host', 'play.host.home@host',
         'play.client.EggShootOut@c1', 'play.client.Bathroom@c1', 'play.client.PetriDish@c1', 'play.client.Troy@c1', 'play.client.Satellite@c1', 'play.client.home@c1', 'tour.done') }
     'boss' = @{ Seconds = 800; Expect = @('boss.host.on@host', 'boss.host.states@host', 'boss.client.states@c1', 'boss.client.held@c1', 'tour.done') }
+    'latejoin' = @{ Seconds = 800; ClientArgs = '-rt-join-after 60'; Expect = @('latejoin.host.look@host', 'latejoin.client.muted@c1', 'latejoin.client.look@c1', 'tour.done') }
     'spawns' = @{ Seconds = 200; Expect = @(
         'spawns.host.announced@host', 'spawns.host.despawned@host', 'spawns.host.one@host',
-        'spawns.client.copied@c1', 'spawns.client.adopted@c1', 'spawns.client.removed@c1', 'spawns.client.despawned@c1', 'tour.done') }
+        'spawns.client.copied@c1', 'spawns.client.adopted@c1', 'spawns.client.removed@c1', 'spawns.client.despawned@c1', 'spawns.client.late@c1', 'tour.done') }
     'full' = @{ Seconds = 120; Expect = @('net.welcome@c1', 'net.rejected@c2', 'full.host.one@host', 'tour.done@host') }
     'portrait' = @{ Seconds = 120; Expect = @('avatar.morty', 'portrait.saved', 'tour.done') }
     'survey' = @{ Seconds = 90; Expect = @('tour.done@host') }
@@ -49,13 +50,14 @@ $busy | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction Silen
 $spec = $tours[$Tour]
 if ($Seconds -le 0) { $Seconds = $spec.Seconds }
 foreach ($old in @(Get-ChildItem $labRoot -Filter 'rick-and-morty-together-lab.log' -Recurse -Depth 1 -ErrorAction SilentlyContinue)) {
-    for ($try = 0; $try -lt 30; $try++) {
+    for ($try = 0; $try -lt 60; $try++) {
         try { Remove-Item -LiteralPath $old.FullName -Force -ErrorAction Stop; break }
-        catch { if ($try -eq 29) { throw "The lab log $($old.FullName) is still in use after 30 s." }; Start-Sleep 1 }
+        catch { if ($try -eq 59) { throw "The lab log $($old.FullName) is still in use after 60 s." }; Start-Sleep 1 }
     }
 }
 $hostArgs = ''; $clientArgs = ''
 if ($spec.HostArgs) { $hostArgs = ' ' + $spec.HostArgs }
+if ($spec.ClientArgs) { $clientArgs = ' ' + $spec.ClientArgs }
 $name = $Tour
 if ($Lag -gt 0) { $hostArgs += " -rt-lag $Lag"; $clientArgs += " -rt-lag $Lag"; $name += "-lag$Lag" }
 if ($Mutate) { $hostArgs += " -rt-mutate $Mutate"; $clientArgs += " -rt-mutate $Mutate"; $name = "mutants/$Tour-$($Mutate -replace ',', '+')" }
@@ -118,6 +120,7 @@ foreach ($lab in 'lab-host', 'lab-c1', 'lab-c2', 'lab-c3') {
 $result = Get-Content $out -Raw | ConvertFrom-Json
 Write-Output ("{0}: {1}" -f $name, $(if ($result.pass) { 'PASS' } else { 'FAIL' }))
 foreach ($f in $result.failures) { Write-Output "  - $f" }
+if ($result.desync.npc.midjoin) { Write-Output ("  NPC lines: not compared for a mid-scene joiner: " + ($result.desync.npc.midjoin -join ', ')) }
 if ($result.desync.npc.note) { Write-Output ("  NPC lines: " + $result.desync.npc.note) }
 Write-Output ("  desync: rest max {0} m, moving max {1} m over {2} pairs" -f $result.desync.rest_max, $result.desync.moving_max, $result.desync.pairs)
 foreach ($p in $result.instances.PSObject.Properties) {

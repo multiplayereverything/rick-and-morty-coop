@@ -2,6 +2,39 @@
 
 Newest first. Each entry: what changed, why, and how it was tested. Decisions made without asking are marked **Decision**.
 
+## 0.7.0 (2026-10-28, protocol 7)
+
+Late joiners, characters looking at the nearest player, flat-screen teleporting, and slow machines.
+
+- **Characters look at the nearest player:** when the story aims Rick or Morty at "the player"
+  (`BrainControlledModule_CharacterHeadLook.LookAtPlayer`), each copy turns that to the nearest player's head
+  (another player's drawn head, or this player's own), twice a second.
+- **Joining mid-scene:** a player who loads a scene the host has been in for 15 s or more starts that scene's story
+  from its beginning; its opening lines would play for them alone. Their voiced lines are completed without playing
+  (the module's own completion, so the story moves on) from the load until 15 s after the scene's first line there.
+  The host's scene message now carries how long it has been in that scene (`Op.Scene`, protocol 7).
+  - **Known limit:** after that, the joiner's timed banter trails the host's until the next shared story event
+    (the story graph's running state is not copied). Players still see the same items, doors, story progress and
+    levels; the verifier reports this case instead of comparing it.
+- **Fix (flat-screen mode):** teleporting stayed off after every scene load without a headset (the game switches it
+  back on when the new scene's fade-in finishes, and without a headset the fade never finishes). It is switched back
+  on once the scene has run 2 s. Found by the flat tour's new garage step. Mutant `noheadlessteleport`.
+- **Fix (slow machines):** a host's announcement of something the game made could arrive before a slow client had
+  made its own copy; the client dropped the announcement, then removed its own copy as one only it made. The
+  announcement now waits up to 30 s for a matching copy. Found in a late-join run. Mutant `nospawnwait`.
+- **Fix:** a host whose own living room was still starting when it loaded the garage ran the game's scene cleanup too
+  early (NullReferenceException); the cleanup is skipped when there is nothing to clean.
+- **Docs:** `docs/PLAYTEST.md`, the checklist for what only real players can check (two headsets on two Steam
+  accounts, over the internet, flat-screen mode with a real keyboard and mouse).
+- **Lab:** `latejoin` tour (`-rt-join-after` delays a lab client's join); the flat tour now tests T (teleport) in the
+  garage; the spawns tour has a slow-machine case.
+- **Tested** (`artifacts/tests/`):
+  - `latejoin` tour: PASS (client joins 60 s late in the garage; Rick looks at the client's head when it is nearer;
+    the client's opening lines are skipped).
+  - `spawns`, `flat`, `spectator`: PASS on the final build (rerun 2026-10-29); `handoff`, `controls`, `story`: PASS.
+  - Mutants `noopeningmute`, `nolooknearest` (latejoin), `noheadlessteleport` (flat), `nospawnwait` (spawns): each
+    caught. `tests/rules-test.py`: 0 failed.
+
 ## 0.6.0 (2026-10-28, protocol 6)
 
 Enemies, the final boss and death work in co-op; the whole garage, every mission area, is played through together.

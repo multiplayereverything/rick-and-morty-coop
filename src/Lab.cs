@@ -21,6 +21,7 @@ namespace RickAndMortyTogether
         static readonly HashSet<string> mutants = new HashSet<string>();   // lab-only
         float nextMetric, nextState;
         float labJoinRetryAt;
+        float labJoinAfter;   // -rt-join-after N: a lab client that joins N s after starting (a late joiner)
         string labTour = "";
         readonly System.Diagnostics.Stopwatch labWatch = new System.Diagnostics.Stopwatch();
         long labModTicks; int labFrames; float labWindowStart;
@@ -31,6 +32,7 @@ namespace RickAndMortyTogether
             {
                 if (args[i] == "-rt-lab") LabMode = true;
                 if (args[i] == "-rt-tour" && i + 1 < args.Length) labTour = args[++i];
+                if (args[i] == "-rt-join-after" && i + 1 < args.Length) float.TryParse(args[++i], out labJoinAfter);
                 if (args[i] == "-rt-mutate" && i + 1 < args.Length) foreach (string m in args[++i].Split(',')) if (m.Length > 0) mutants.Add(m);
                 if (args[i] == "-rt-lag" && i + 1 < args.Length) { int lag; if (int.TryParse(args[++i], out lag)) { Transport.LagMs = Mathf.Clamp(lag, 0, 1000); Transport.JitterMs = Transport.LagMs / 2; } }
             }
@@ -113,7 +115,7 @@ namespace RickAndMortyTogether
                 for (int i = 0; i < 3; i++) { if ((at[i] - lastParts[i]).sqrMagnitude > 0.09f) lastJumpAt = now; lastParts[i] = at[i]; }
             }
             // Lab clients may start before the host listens; keep retrying instead of giving up.
-            if (autoRole == "join" && transport == null && now >= labJoinRetryAt) { labJoinRetryAt = now + 3; StartJoin(); }
+            if (autoRole == "join" && transport == null && now >= labJoinRetryAt && now >= labJoinAfter) { labJoinRetryAt = now + 3; StartJoin(); }
             if (now >= nextMetric)
             {
                 nextMetric = now + 2;

@@ -231,7 +231,7 @@ namespace RickAndMortyTogether
 
         void ClientAreas(BinaryReader r)
         {
-            HostScene = Wire.Text(r, 64);
+            SetHostScene(Wire.Text(r, 64), -1);
             string stage = Wire.Text(r, 128);
             hostZone = Wire.Text(r, 128);
             int count = r.ReadByte();
@@ -290,7 +290,7 @@ namespace RickAndMortyTogether
                 // Tell everyone as the fade starts, so their loads run alongside the host's and the story timers
                 // in the new scene start together.
                 pendingLoad = scene; pendingLoadAt = Time.realtimeSinceStartup;
-                Broadcast(Wire.Packet(Op.Scene, w => Wire.Text(w, scene)), -1);
+                Broadcast(Wire.Packet(Op.Scene, w => { Wire.Text(w, scene); w.Write(0f); }), -1);
                 Log("Loading " + scene + " for everyone");
             }
             else if (Active && !(followingLoad || scene == HostScene || Mutant("noscenefollow")))
@@ -302,7 +302,9 @@ namespace RickAndMortyTogether
             // Without a headset the game's fader never finishes (its SteamVR overlay is missing): load straight away.
             if (Headless)
             {
-                GameUtils.CleanupAllSystemInPreparationForSceneChange();
+                // The game's cleanup needs its teleport system and rig; a scene still starting up has nothing to clean.
+                GlobalStorage g = GlobalStorage.no_instantiate_instance;
+                if (g != null && g.TeleportationController != null && Master != null) GameUtils.CleanupAllSystemInPreparationForSceneChange();
                 SceneManager.LoadScene(scene);
                 return false;
             }
@@ -314,6 +316,7 @@ namespace RickAndMortyTogether
             if (!Active) return;
             if (Hosting)
             {
+                HostSceneAge();   // keeps the time this host entered its scene
                 if (now >= nextAreaSync) { nextAreaSync = now + 3f; BroadcastAreas(); }
                 // A player who just arrived in the host's scene gets what is in it now (what the game made, owners,
                 // where things rest), not the scene as it loads.
@@ -323,7 +326,7 @@ namespace RickAndMortyTogether
                 return;
             }
             string here = SceneManager.GetActiveScene().name;
-            if (followingLoad && here == HostScene) { followingLoad = false; Log("Followed the host into " + here); }
+            if (followingLoad && here == HostScene) { followingLoad = false; Log("Followed the host into " + here); ArrivedInHostScene(); }
             if (HostScene.Length == 0 || here == HostScene || here == "Loading" || Mutant("noscenefollow")) return;
             GlobalStorage g = GlobalStorage.no_instantiate_instance;
             // Only from a scene that has finished starting (a copy still starting up has no teleport system yet, and
@@ -331,6 +334,7 @@ namespace RickAndMortyTogether
             if (!followingLoad && g != null && g.TeleportationController != null && Master != null)
             {
                 followingLoad = true; followLoadAt = now;
+                FollowStarting();
                 Log("Following the host into " + HostScene);
                 g.FadeAndLoadScene(HostScene, 1f);
             }

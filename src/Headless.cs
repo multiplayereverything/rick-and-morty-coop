@@ -39,8 +39,26 @@ namespace RickAndMortyTogether
             typeof(VRPlatform).GetField("currVRPlatformHardwareType", s).SetValue(null, VRPlatformHardwareType.SteamVRCompatible);
         }
 
+        string teleportScene = "";
+        float teleportSceneAt;
+
         void HeadlessUpdate()
         {
+            // Teleporting is switched off for a scene load and back on when the new scene's fade-in finishes
+            // (FadeInOnStart); without a headset that fade never finishes. Switch it back on once the scene has run 2 s.
+            if (Headless && !Mutant("noheadlessteleport"))
+            {
+                string scene = SceneManager.GetActiveScene().name;
+                if (scene != teleportScene) { teleportScene = scene; teleportSceneAt = Time.realtimeSinceStartup; }
+                GlobalStorage g = GlobalStorage.no_instantiate_instance;
+                if (Time.realtimeSinceStartup - teleportSceneAt > 2f && g != null && g.TeleportationController != null && !g.TeleportationController.CanTeleport
+                    && (DeathController.Instance == null || !DeathController.Instance.PlayerIsDead))
+                {
+                    g.TeleportationController.CanTeleport = true;
+                    teleportSceneAt = float.MaxValue;
+                    Log("Headless: teleporting on in " + scene + " (the fade-in that would do it never finishes without a headset)");
+                }
+            }
             if (!Headless) return;
             if (!PlaySpaceSizeSelector.isComplete)
             {

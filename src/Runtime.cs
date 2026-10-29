@@ -23,7 +23,7 @@ namespace RickAndMortyTogether
     // (later) story; every player owns their own head and hands.
     public sealed partial class TogetherRuntime : MonoBehaviour
     {
-        public const string ModVersion = "0.6.0";
+        public const string ModVersion = "0.7.0";
         public static TogetherRuntime Instance;   // process-scoped
         public static Action<string> Log = delegate { };   // process-scoped
         public static string Root = "";   // process-scoped
@@ -83,7 +83,7 @@ namespace RickAndMortyTogether
         void Start()
         {
             if (autoRole == "host") StartHost(false);
-            else if (autoRole == "join") StartJoin();
+            else if (autoRole == "join" && labJoinAfter <= 0) StartJoin();   // a lab late joiner joins from LabUpdate
             else if (autoRole == "steamhost") StartSteamHost();
             else if (autoRole == "steamjoin") StartSteamFind();
         }
@@ -162,6 +162,7 @@ namespace RickAndMortyTogether
                     StoryUpdate(now);
                     EnemiesUpdate(now);
                     BossUpdate(now);
+                    LookUpdate(now);
                 }
                 AvatarsUpdate();
                 SpectatorUpdate();
@@ -318,7 +319,7 @@ namespace RickAndMortyTogether
                         ApplyPose(p, pose);
                         return;
                     }
-                case Op.Scene: { HostScene = Wire.Text(r, 64); return; }
+                case Op.Scene: { string scene = Wire.Text(r, 64); SetHostScene(scene, Wire.Number(r)); return; }
                 case Op.ItemOwner: ClientItemOwner(r); return;
                 case Op.ItemState: ClientItemState(r); return;
                 case Op.ControlState: ClientState(r, Op.ControlState); return;
@@ -368,7 +369,8 @@ namespace RickAndMortyTogether
         void BroadcastScene()
         {
             string scene = HostSceneNow();
-            byte[] packet = Wire.Packet(Op.Scene, w => Wire.Text(w, scene));
+            float age = HostSceneAge();
+            byte[] packet = Wire.Packet(Op.Scene, w => { Wire.Text(w, scene); w.Write(age); });
             foreach (Peer p in peers.Values) if (p.Accepted) Send(p.Id, packet);
         }
 
