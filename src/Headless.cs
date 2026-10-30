@@ -12,14 +12,28 @@ namespace RickAndMortyTogether
     // query throws inside OwlchemyVRStorage.LoadCore during the Loading scene, and the play-space selector waits
     // forever for a chaperone. This repairs both, switches the rig to the game's own debug head and hands, and
     // moves on to the LivingRoom. It never runs when a VR device is active.
+    // Oculus mode (launch option -vrmode Oculus, no SteamVR): the Steam build ships the game's own Oculus path (the
+    // Oculus runtime plugin, CoreLoader-Oculus, the Oculus rig) but always picks SteamVR, so the same start-up fails.
+    // The mod sets the platform to Oculus and makes the same repairs with the game's Oculus rig and play-space check.
     public sealed partial class TogetherRuntime
     {
         public static bool Headless;   // process-scoped
+        public static bool OculusMode; // process-scoped: Unity runs the Oculus runtime (-vrmode Oculus)
         bool headlessRepaired, headlessLoaded;
+        float oculusPlaySpaceAt = -1;  // session-scoped: when the game's Oculus play-space check was started
 
         void InitHeadless()
         {
             Headless = !VRSettings.enabled;
+            OculusMode = VRSettings.enabled && VRSettings.loadedDeviceName == "Oculus";
+            if (OculusMode)
+            {
+                BindingFlags st = BindingFlags.Static | BindingFlags.NonPublic;
+                typeof(VRPlatform).GetField("currVRPlatformType", st).SetValue(null, VRPlatformTypes.Oculus);
+                typeof(VRPlatform).GetField("currVRPlatformHardwareType", st).SetValue(null, VRPlatformHardwareType.OculusRift);
+                Log("Oculus mode: the Oculus runtime is running; using the game's Oculus rig");
+                return;
+            }
             if (!Headless) return;
             SetPlatform();
             if (LabMode)
@@ -59,11 +73,19 @@ namespace RickAndMortyTogether
                     Log("Headless: teleporting on in " + scene + " (the fade-in that would do it never finishes without a headset)");
                 }
             }
-            if (!Headless) return;
+            if (!Headless && !OculusMode) return;
             if (!PlaySpaceSizeSelector.isComplete)
             {
                 PlaySpaceSizeSelector selector = FindObjectOfType<PlaySpaceSizeSelector>();
-                if (selector != null)
+                // Oculus: the game's own guardian check (its start-up never got to it); the smallest layout if it has not
+                // finished in 10 s.
+                if (selector != null && OculusMode && oculusPlaySpaceAt < 0)
+                {
+                    oculusPlaySpaceAt = Time.realtimeSinceStartup;
+                    selector.StartCoroutine((System.Collections.IEnumerator)typeof(PlaySpaceSizeSelector).GetMethod("DetermineOculusPlaySpace", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(selector, null));
+                    Log("Oculus mode: checking the guardian play space");
+                }
+                else if (selector != null && (Headless || Time.realtimeSinceStartup - oculusPlaySpaceAt > 10f))
                 {
                     selector.StopAllCoroutines();
                     LayoutConfiguration[] layouts = (LayoutConfiguration[])typeof(PlaySpaceSizeSelector).GetField("steamVRLayouts", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(selector);
@@ -79,12 +101,12 @@ namespace RickAndMortyTogether
                 typeof(OwlchemyVRStorage).GetField("coreLoader", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(store, core);
                 store.SetMasterHMDAndInput(core.MasterHMDAndInputController);
                 headlessRepaired = true;
-                Log("Headless: rig created (" + core.MasterHMDAndInputController.GetType().Name + ")");
+                Log((OculusMode ? "Oculus mode" : "Headless") + ": rig created (" + core.MasterHMDAndInputController.GetType().Name + ")");
             }
             MasterHMDAndInputController m = Master;
-            if (m != null && !m.DebugModeEnabled) { m.DebugModeEnabled = true; RigActive = LabMode && !FlatMode; }
+            if (Headless && m != null && !m.DebugModeEnabled) { m.DebugModeEnabled = true; RigActive = LabMode && !FlatMode; }
             // LoadGameWhenReady's own fade coroutine died on the missing rig; start the game the same way it would.
-            if (!headlessLoaded && m != null && SceneManager.GetActiveScene().name == "Loading")
+            if (!headlessLoaded && m != null && PlaySpaceSizeSelector.isComplete && SceneManager.GetActiveScene().name == "Loading")
             {
                 headlessLoaded = true;
                 SceneManager.LoadScene("LivingRoom");

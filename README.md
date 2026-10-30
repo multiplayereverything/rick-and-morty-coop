@@ -4,7 +4,7 @@ Co-op for **Rick and Morty: Virtual Rick-ality** (Steam, VR). Two players share 
 clones in the same garage, see each other's head and hands, and can pick things up, throw them and pass them from
 hand to hand.
 
-**Status: 0.9.0 pre-release.** Players, hands, grabbable items, doors, levers, sliders, buttons, the story, level
+**Status: 0.9.1 pre-release.** Players, hands, grabbable items, doors, levers, sliders, buttons, the story, level
 changes, and Rick's and Morty's lines and animations are shared, with the host's game in charge (see
 [What is shared](#what-is-shared)). Things the game makes or destroys while you play are shared too.
 
@@ -41,6 +41,13 @@ Join before the story starts: while the host is still in the living room (the DV
 the garage, a new player is refused with "The game has started. Join while the host is in the living room (the DVD
 menu)." A third player is refused with "The game is full (2 players)." Everyone needs the same mod version; a different
 version is refused with both versions named.
+
+## Play with an Oculus or Meta headset without SteamVR (Oculus mode, untested)
+
+In Steam: right-click the game > Properties > Launch options, type `-vrmode Oculus`, start the Oculus app (and Link or
+Air Link for a Quest), then start the game. The game then uses its own Oculus support instead of SteamVR. This is new
+and not yet checked with a real headset: if it stays black, send `BepInEx/LogOutput.log` and
+`RickAndMortyVR_Data/output_log.txt`. Without the option the game uses SteamVR as before.
 
 ## Play without a headset (flat-screen mode)
 

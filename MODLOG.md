@@ -2,6 +2,16 @@
 
 Newest first. Each entry: what changed, why, and how it was tested. Decisions made without asking are marked **Decision**.
 
+## 0.9.1 (2026-10-30, protocol 9)
+
+- **Oculus mode** (user: a friend with an Oculus headset got a black screen): with the launch option `-vrmode Oculus`
+  the game runs on the Oculus runtime, without SteamVR. The Steam build ships the game's own Oculus path (the Oculus
+  runtime plugin, `CoreLoader-Oculus`, the `Oculus_HMDAndInput` rig) but always picks SteamVR, so its start-up failed.
+  The mod sets the platform to Oculus, starts the game's own guardian play-space check (the smallest layout if it has not
+  finished in 10 s), builds the game's Oculus rig and loads the living room. Plays with 0.9.0 (same protocol).
+- **Not tested:** the lab has no Oculus runtime; this needs a player with an Oculus or Meta headset. The lab's
+  no-headset start-up path is unchanged except that it now waits for the play space before loading the living room.
+
 ## 0.9.0 (2026-10-30, protocol 9)
 
 The garage intro played through by two players in the lab, by their actions: the laundry, Rick's scripted shooting,
