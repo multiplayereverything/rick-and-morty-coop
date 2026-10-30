@@ -102,6 +102,7 @@ namespace RickAndMortyTogether
                 // A part the game made and attached (the computer's RAM stick, crystal, fuse) is made and attached by the game on
                 // every copy, but whether its rigidbody is on at this moment differs: look again once it is loose.
                 // Each copy's game made it there, so it gets its id from the point instead of a host announcement.
+                if (InPerPlayerArea(grab)) { passedOver.Add(grab); continue; }
                 if (IsSpawned(grab.transform) && AttachedPart(grab) && !Mutant("noattachwait")) { if (!Mutant("noattachsync")) RegisterPointPart(grab); continue; }
                 Rigidbody body = grab.GetComponent<Rigidbody>();
                 LimitedIndirectGrabbableController control = grab.GetComponent<LimitedIndirectGrabbableController>();
@@ -309,6 +310,8 @@ namespace RickAndMortyTogether
                 if (item.Part != null) { RefreshBody(item); item.WasInPoint = InPoint(item); }
                 // Owner: one state as soon as it went into or out of an attach point (an attached part streams nothing).
                 if (item.AttachDirty && item.Owner == LocalId && (Hosting || item.Confirmed)) { item.AttachDirty = false; item.LastSend = now; Broadcast(StatePacket(item, !item.Grab.IsCurrInHand), -1); }
+                // Owner: a part on this player's body moves with the player; stream its pose for the other copies.
+                if (item.Owner == LocalId && (Hosting || item.Confirmed) && OnOwnPlayer(item) && now - item.LastSend >= 0.1f) { item.LastSend = now; Broadcast(StatePacket(item, false), -1); }
                 if (item.Body == null) continue;
                 if (item.Owner != LocalId)
                 {

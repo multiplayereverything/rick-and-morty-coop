@@ -145,7 +145,7 @@ namespace RickAndMortyTogether
                 string key = KeyOf(b.transform);
                 bool local = false;
                 foreach (string p in LocalButtonPaths) if (key.Contains(p)) local = true;
-                if (local) { triggerOf[b] = null; continue; }
+                if (local || InPerPlayerArea(b)) { triggerOf[b] = null; continue; }
                 if (AddTrigger(b, key, 1) == null) continue;
                 PushableButton button = b;
                 b.OnButtonPushed += x => LocalFired(button);
@@ -153,6 +153,7 @@ namespace RickAndMortyTogether
             foreach (PullCordController c in UnityEngine.Object.FindObjectsOfType<PullCordController>())
             {
                 if (triggerOf.ContainsKey(c)) continue;
+                if (InPerPlayerArea(c)) { triggerOf[c] = null; continue; }
                 if (AddTrigger(c, KeyOf(c.transform), 2) == null) continue;
                 PullCordController cord = c;
                 c.OnPullCordPulled += x => LocalFired(cord);
@@ -215,12 +216,7 @@ namespace RickAndMortyTogether
             try
             {
                 PushableButton button = t.Source as PushableButton;
-                if (button != null)
-                {
-                    buttonReadyField.SetValue(button, true);
-                    bool restsUp = (PushableButton.RestingPositionType)buttonRestField.GetValue(button) == PushableButton.RestingPositionType.UpperLimit;
-                    (restsUp ? buttonLockLower : buttonLockUpper).Invoke(button, new object[] { false });
-                }
+                if (button != null) PressButton(button);
                 PullCordController cord = t.Source as PullCordController;
                 if (cord != null)
                 {
@@ -230,6 +226,14 @@ namespace RickAndMortyTogether
             }
             finally { replaying = false; }
             Log("Replayed " + t.Source.name + " from another player");
+        }
+
+        // The button's own end-of-travel lock, which fires OnButtonPushed as a hand's push does.
+        static void PressButton(PushableButton button)
+        {
+            buttonReadyField.SetValue(button, true);
+            bool restsUp = (PushableButton.RestingPositionType)buttonRestField.GetValue(button) == PushableButton.RestingPositionType.UpperLimit;
+            (restsUp ? buttonLockLower : buttonLockUpper).Invoke(button, new object[] { false });
         }
     }
 

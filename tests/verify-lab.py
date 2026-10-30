@@ -29,6 +29,7 @@ MIDJOIN = re.compile(r"Joining (\S+) mid-scene")
 FX = re.compile(r"RT-FX ht=(\S+) scene=(\S+) fx=(\S+)")
 NPC_MODULES = ("BrainControlledModule_Voice.", "BrainControlledModule_Animation.", "BrainControlledModule_RickCinematicEvent.", "BrainControlledModule_InterruptAllCharacters.")
 FX_WINDOW = 3.0
+DEATH_TRAIL = 60.0    # after a copy's own respawn its story's timed lines trail the others' until the next shared event
 SCENE_SETTLE = 12.0   # a copy that just loaded a scene runs that scene's opening effects itself; compare after that
 REST_LIMIT, MOVING_LIMIT = 0.05, 0.5
 CONTROL_REST_LIMIT = 0.02
@@ -131,7 +132,7 @@ def main():
             out = args[i + 1]; i += 2
         else:
             i += 1
-    results, failures, grids, effects, scenes = {}, [], {}, {}, {}
+    results, failures, grids, effects, scenes, dead = {}, [], {}, {}, {}, {}
     for role, folder in LABS.items():
         path = root / "private" / folder / "rick-and-morty-together-lab.log"
         if not path.exists():
@@ -139,6 +140,7 @@ def main():
         metrics, checks, moderrors, states, fx = parse(path)
         effects[role] = fx
         scenes[role] = [(float(s.get("ht", 0)), s.get("scene", "")) for s in states]
+        dead[role] = [float(s.get("ht", 0)) for s in states if "Death" in s.get("zone", "")]
         info = {"checks": [{"name": n, "pass": p, "detail": d} for n, p, d in checks], "moderrors": moderrors[:5]}
         for n, p, d in checks:
             if not p:
@@ -223,9 +225,12 @@ def main():
     # NPC dialogue and animation: the same effects on every copy that shares the scene.
     npc = {"pairs": 0, "missing": 0, "first_missing": ""}
 
+    # A player's own death (each copy's own) holds that copy's story until it respawns: its next lines start from its
+    # own respawn, so a copy in its death area in the last DEATH_TRAIL seconds is not compared (reported as a limit).
     def in_scene(role, t, scene):
         near = [s for ht, s in scenes.get(role, []) if t - SCENE_SETTLE <= ht <= t + FX_WINDOW + 2]
-        return len(near) >= 3 and all(s == scene for s in near)
+        recently_dead = any(t - DEATH_TRAIL <= ht <= t + FX_WINDOW + 2 for ht in dead.get(role, []))
+        return len(near) >= 3 and all(s == scene for s in near) and not recently_dead
 
     # A copy that joined a scene mid-way runs that scene's story from its start: its timed lines trail the host's
     # until the next shared event. Not compared there (reported instead).

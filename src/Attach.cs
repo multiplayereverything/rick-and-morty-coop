@@ -15,9 +15,17 @@ namespace RickAndMortyTogether
 
         static string PointKey(AttachablePoint p) { return p != null ? KeyOf(p.transform) : ""; }
 
-        static string AttachKeyOf(NetItem item) { return item.Part != null ? PointKey(item.Part.CurrentlyAttachedTo) : ""; }
+        // A point on the player's own body (the smartwatch's wrist strap): each copy has one for its own player.
+        const string OnPlayer = "player";
+        static bool RigPoint(AttachablePoint p) { return p != null && p.GetComponentInParent<MasterHMDAndInputController>() != null && !Mutant("nowristlocal"); }
 
+        // A part on its owner's body is sent as "on the player": other copies show it where the owner's hand is.
+        static string AttachKeyOf(NetItem item) { return item.Part == null ? "" : RigPoint(item.Part.CurrentlyAttachedTo) ? OnPlayer : PointKey(item.Part.CurrentlyAttachedTo); }
+
+        // In a point here (not on this copy's own player).
         static bool InPoint(NetItem item) { return item.Part != null && item.Part.CurrentlyAttachedTo != null; }
+
+        static bool OnOwnPlayer(NetItem item) { return item.Part != null && RigPoint(item.Part.CurrentlyAttachedTo); }
 
         static AttachablePoint FindPoint(string key)
         {
@@ -43,7 +51,18 @@ namespace RickAndMortyTogether
 
         void ApplyAttach(NetItem item, string key)
         {
-            if (item.Part == null || Mutant("noattachsync") || AttachKeyOf(item) == key) return;
+            if (item.Part == null || Mutant("noattachsync") || (AttachKeyOf(item) == key && key != OnPlayer)) return;
+            // On another player's body: out of any point here (never onto this player's own), following the owner's pose.
+            if (key == OnPlayer)
+            {
+                if (item.Part.CurrentlyAttachedTo == null) return;
+                applyingAttach = true;
+                try { item.Part.Detach(); } finally { applyingAttach = false; }
+                AttachesApplied++;
+                RefreshBody(item);
+                Log("Attach: " + item.Grab.name + " is on another player");
+                return;
+            }
             AttachablePoint point = key.Length > 0 ? FindPoint(key) : null;
             if (key.Length > 0 && point == null) { Log("Attach: no point " + key + " here for " + item.Grab.name); return; }
             applyingAttach = true;

@@ -34,6 +34,7 @@ namespace RickAndMortyTogether
         static readonly FieldInfo progressionListField = typeof(ProgressionManager).GetField("progressionList", BindingFlags.Instance | BindingFlags.NonPublic);   // process-scoped (reflection handle)
         readonly Dictionary<string, float> recentCauses = new Dictionary<string, float>();
         public int CausesSent, CausesReplayed, CausesRequested;   // lab checks read these
+        public int DeathTeleportsFromClients;   // session-scoped: lab check (a client's respawn sent as a shared event)
         public string LastReplayedCause = "";
         string hostStage = "";
         readonly List<string> hostAreas = new List<string>();
@@ -67,8 +68,11 @@ namespace RickAndMortyTogether
         // DEATH / RESPAWN events. A dead player's story events stay on their own copy; the others play on.
         static readonly string[] PerPlayerAreas = { "Death" };   // process-scoped (a constant)
         static bool PerPlayerArea(string name) { return Array.IndexOf(PerPlayerAreas, name) >= 0 && !Mutant("nodeathlocal"); }
+        // Something in a player's own area (the death scene's phone, handset and respawn button): each copy keeps its own.
+        static bool InPerPlayerArea(Component c) { return c != null && PerPlayerArea(c.gameObject.scene.name) && !Mutant("nodeathobjects"); }
         public static bool LocalPlayerDead { get { return DeathController.Instance != null && DeathController.Instance.PlayerIsDead && !Mutant("nodeathlocal"); } }
-        static bool DeathCause(string key) { return (key == "DEATH" || key == "RESPAWN") && !Mutant("nodeathlocal"); }
+        // A teleport into or out of the death area (the respawn) is that player's too.
+        static bool DeathCause(string key) { return (key == "DEATH" || key == "RESPAWN" || (key.Contains("TeleportZone_Death") && !Mutant("nodeathteleport"))) && !Mutant("nodeathlocal"); }
 
         static bool KnownCause(string key)
         {
@@ -85,6 +89,7 @@ namespace RickAndMortyTogether
                 if (!KnownCause(key)) return true;
                 recentCauses[key] = Time.realtimeSinceStartup;
                 CausesSent++;
+                if (labTour.Length > 0) Log("RT-CAUSE " + key);
                 Broadcast(CausePacket(key, hasAmount, amount), -1);
                 return true;
             }
@@ -103,6 +108,7 @@ namespace RickAndMortyTogether
             string key = Wire.Text(r, 256); bool hasAmount = r.ReadBoolean(); float amount = Wire.Number(r);
             if (LocalCause(key)) return;
             CausesFromClients++;
+            if (key.Contains("TeleportZone_Death")) DeathTeleportsFromClients++;
             float seen;
             // The host's own copy already saw it (a replayed button press fires the same event on both copies).
             if (!hasAmount && recentCauses.TryGetValue(key, out seen) && Time.realtimeSinceStartup - seen < CauseEcho) return;
