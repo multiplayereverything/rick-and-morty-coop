@@ -2,6 +2,51 @@
 
 Newest first. Each entry: what changed, why, and how it was tested. Decisions made without asking are marked **Decision**.
 
+## 0.9.0 (2026-10-30, protocol 9)
+
+The garage intro played through by two players in the lab, by their actions: the laundry, Rick's scripted shooting,
+the teleport lesson, Rick's smartwatch and the computer repair. Mid-scene joining is gone (user, 2026-10-30).
+
+- **Joining only before the story starts** (user: "get rid of mid-scene completely and disabled"): the host refuses a
+  player while it is anywhere but the living room (the DVD menu), with "The game has started. Join while the host is in
+  the living room (the DVD menu)." The opening-line mute for a mid-scene joiner and the host's time-in-scene in
+  `Op.Scene` are removed. Mutant `nojoinlock` (tour `latejoin`, now the refusal test). "Characters look at the nearest
+  player" moved to its own tour `look` (mutant `nolooknearest`).
+- **Fix: the death scene is each player's own.** Its death phone handset and respawn button were synced like any
+  other item and button: one player answering their phone revived the other, picking the handset up took the other's
+  out of its cradle, and the host's game removing its handset removed the client's. Objects in a player's own area
+  (`Death`) are no longer synced. Mutant `nodeathobjects`.
+- **Fix: a respawn is the player's own story event.** A client's teleport out of its death area
+  (`TELEPORTED_FROM:Head:TeleportZone_Death`) ran on the host's story too. Teleports into or out of the death area now
+  stay on their own copy, like DEATH and RESPAWN. Mutant `nodeathteleport`.
+- **Rick's smartwatch:** it goes on its wearer's own wrist; a point on a player's own body (inside their rig) is sent
+  as "on the player", so the other copies take the watch out of any point and show it following the wearer's hand
+  (the wearer streams its pose) instead of strapping it to their own wrist. Mutant `nowristlocal`.
+- **Watch calls heard by everyone** (user): each clip the wearer's watch plays (`SmartWatchController.PlayCallClip`,
+  calls and quick lines) goes to every player (`Op.WatchClip`, protocol 9), who hears it at full volume. Mutant
+  `nowatchaudio`.
+- **Fix: a part put in a socket before another copy had it.** The host's state for something the game made arrived
+  before the client had made or copied it (it waits up to 30 s for its own) and was dropped, so the client's copy stayed
+  out of the socket (the computer's fuse). The latest such state is now kept and applied when the item arrives.
+  Mutant `noearlystate`.
+- **Lab:** the `laundry` tour plays the intro: Rick's dumped laundry picked up by hand into the washer (the story needs
+  the grab), the wash; both players die in Rick's scripted shooting and each answers their own death phone (the client
+  must stay dead after the host's); the client does the teleport lesson (the story moves on for both); the client puts
+  on the watch (the host must see it at the client's hand, not on its own wrist) and answers Rick's calls (the host must
+  hear them); then the computer: the host fits the crystal and the fuse, the client the RAM stick, and both stories count
+  it repaired. The verifier no longer compares Rick's and Morty's lines on a copy within 60 s of its own death area: each
+  player's story resumes from their own respawn.
+  - **Known gap:** where the game hands out the working RAM stick and fuse during FixComputerTask is not established
+    (nothing in the garage fits, and no combinator recipe makes them); the tour's host makes them from the computer's
+    own working-part prefabs after 30 s.
+- **Tested** (`artifacts/tests/`): `laundry`: PASS (13/13 on each copy); `latejoin`: PASS (the late client refused with
+  the message); `look`: PASS. Mutants `nojoinlock`, `nolooknearest`, `nodeathobjects`, `nodeathteleport`,
+  `nowristlocal`, `nowatchaudio`, `noearlystate`: each caught. Full suite on the 0.9.0 build:
+  `handoff`, `handoff -Steam`, `handoff -Lag 120`, `controls`, `story`, `spectator`, `flat`, `spawns`, `enemies`,
+  `death`, `boss`, `playthrough`, `garage`, `full -Players 3`: PASS. `combinator` failed twice in four runs on Rick's and
+  Morty's line timing (the same lines in the same order, one 4 s later on one copy: a line waits on its character's
+  animation, whose start varies between copies); the verifier's line window is now 5 s (was 3), then PASS.
+
 ## 0.8.0 (2026-10-30, protocol 8)
 
 Parts in sockets are shared, and the combinator and the laundry task are checked with two players.

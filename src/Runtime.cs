@@ -23,7 +23,7 @@ namespace RickAndMortyTogether
     // (later) story; every player owns their own head and hands.
     public sealed partial class TogetherRuntime : MonoBehaviour
     {
-        public const string ModVersion = "0.8.0";
+        public const string ModVersion = "0.9.0";
         public static TogetherRuntime Instance;   // process-scoped
         public static Action<string> Log = delegate { };   // process-scoped
         public static string Root = "";   // process-scoped
@@ -214,6 +214,8 @@ namespace RickAndMortyTogether
         }
 
         // Sender rule: the host takes only these ops from clients; anything else is a protocol error.
+        public int JoinsRefusedMidGame;   // session-scoped: lab check (joins refused because the story is under way)
+
         void HostPacket(int from, Op op, BinaryReader r)
         {
             Peer peer;
@@ -229,6 +231,16 @@ namespace RickAndMortyTogether
                     transport.SendAndClose(from, Wire.Packet(Op.Reject, w => Wire.Text(w, why)));
                     Log("Refused " + peer.Name + ": " + why);
                     Check("net.version.refused", true, why);
+                    peers.Remove(from);
+                    return;
+                }
+                // Joining is only before the story starts: in the living room (the DVD menu), not in a scene under way.
+                if (SceneManager.GetActiveScene().name != "LivingRoom" && !Mutant("nojoinlock"))
+                {
+                    string why = "The game has started. Join while the host is in the living room (the DVD menu).";
+                    transport.SendAndClose(from, Wire.Packet(Op.Reject, w => Wire.Text(w, why)));
+                    Log("Refused " + peer.Name + ": the game is under way in " + SceneManager.GetActiveScene().name);
+                    JoinsRefusedMidGame++;
                     peers.Remove(from);
                     return;
                 }
@@ -263,6 +275,7 @@ namespace RickAndMortyTogether
                 case Op.Cause: HostCause(from, r); return;
                 case Op.Despawn: HostDespawn(from, r); return;
                 case Op.EnemyHit: HostEnemyHit(from, r); return;
+                case Op.WatchClip: HostWatchClip(from, r); return;
                 default: throw new IOException("op " + op + " is not accepted from clients");
             }
         }
@@ -319,7 +332,7 @@ namespace RickAndMortyTogether
                         ApplyPose(p, pose);
                         return;
                     }
-                case Op.Scene: { string scene = Wire.Text(r, 64); SetHostScene(scene, Wire.Number(r)); return; }
+                case Op.Scene: SetHostScene(Wire.Text(r, 64)); return;
                 case Op.ItemOwner: ClientItemOwner(r); return;
                 case Op.ItemState: ClientItemState(r); return;
                 case Op.ControlState: ClientState(r, Op.ControlState); return;
@@ -333,6 +346,7 @@ namespace RickAndMortyTogether
                 case Op.Enemies: ClientEnemies(r); return;
                 case Op.PlayerHit: ClientPlayerHit(r); return;
                 case Op.BossState: ClientBossState(r); return;
+                case Op.WatchClip: ClientWatchClip(r); return;
                 default: throw new IOException("op " + op + " is not expected from the host");
             }
         }
@@ -369,8 +383,7 @@ namespace RickAndMortyTogether
         void BroadcastScene()
         {
             string scene = HostSceneNow();
-            float age = HostSceneAge();
-            byte[] packet = Wire.Packet(Op.Scene, w => { Wire.Text(w, scene); w.Write(age); });
+            byte[] packet = Wire.Packet(Op.Scene, w => Wire.Text(w, scene));
             foreach (Peer p in peers.Values) if (p.Accepted) Send(p.Id, packet);
         }
 

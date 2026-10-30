@@ -1,6 +1,10 @@
 # Handoff
 
-## State (2026-10-30, 0.8.0, protocol 8)
+## State (2026-10-30, 0.9.0, protocol 9)
+
+- The garage intro with two players, by their actions (tour `laundry`): laundry and wash, the scripted death (each
+  player's own death phone), the teleport lesson, Rick's smartwatch (worn by one, calls heard by all), the computer
+  repair. Joining only from the living room (tour `latejoin`).
 
 - Parts in sockets are shared (`src/Attach.cs`; tour `garage` steps `garage.*.attach` / `detach`, mutant
   `noattachsync`); parts the game made in a point get their id from the point. The combinator (tour `combinator`) and
@@ -43,10 +47,10 @@
    `garage`, checks `garage.*.start`). Not reproduced; waiting for the user to say where each Morty was. VR-only
    differences: the room-size layout (`PlayspacePositionalOffset`) offsets a headset player from the pad, and the start
    teleport only fires if no pad is current when the new pads register.
-1. **Laundry task, rest:** the lab's wash leaves the stage at LaundryTask on both copies; what the story wants next
-   (drying, the basket) is unchecked.
-2. **Mid-scene join, rest:** the joiner's timed banter trails the host's until the next shared story event; copy the
-   Brain's running nodes if players notice.
+1. **After the computer:** the story's next step in FixComputerTask is Rick's call "OrderNewThing" (ordering on the
+   computer), then PlungerTask (the courier already delivered a broken Plunginator). Where the game hands out the
+   working RAM stick and fuse is not established (the tour makes them). Continue the intro tour from there.
+2. **Mid-scene join:** removed and disabled (user, 2026-10-30); don't add it back.
 3. **Real headset check of the fade path** (the lab loads without the fade).
 4. **Enemies in real play:** mirrored enemies and nearest-player aim checked only in the lab.
 5. Friends' lobbies in the browser (Steam friends' game info), two-account Steam P2P test.

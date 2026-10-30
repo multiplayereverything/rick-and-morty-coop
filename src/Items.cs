@@ -53,7 +53,7 @@ namespace RickAndMortyTogether
         void ResetItems()
         {
             foreach (NetItem item in items.Values) StopFollowing(item);
-            items.Clear(); itemOf.Clear(); passedOver.Clear(); Started.Clear(); itemScene = ""; nextItemScan = 0;
+            items.Clear(); itemOf.Clear(); passedOver.Clear(); Started.Clear(); earlyStates.Clear(); itemScene = ""; nextItemScan = 0;
             triggers.Clear(); triggerOf.Clear(); FollowingControls.Clear(); ResetSpawns();
         }
 
@@ -272,12 +272,21 @@ namespace RickAndMortyTogether
 
         void ClientItemState(BinaryReader r) { ClientState(r, Op.ItemState); }
 
+        // Item states for something the game made that this copy has not made or copied yet (it waits up to 30 s for its
+        // own): the latest one per id, applied when it arrives. An attached part sends one state only.
+        readonly Dictionary<uint, byte[]> earlyStates = new Dictionary<uint, byte[]>();   // session-scoped
+
         void ClientState(BinaryReader r, Op op)
         {
             long start = r.BaseStream.Position;
             uint id = r.ReadUInt32(); ushort epoch = r.ReadUInt16();
             NetItem item;
-            if (!items.TryGetValue(id, out item) || item.Owner == LocalId || epoch < item.Epoch) return;
+            if (!items.TryGetValue(id, out item))
+            {
+                if (op == Op.ItemState && !Mutant("noearlystate")) { r.BaseStream.Position = start; earlyStates[id] = r.ReadBytes((int)(r.BaseStream.Length - start)); }
+                return;
+            }
+            if (item.Owner == LocalId || epoch < item.Epoch) return;
             r.BaseStream.Position = start;
             if (op == Op.ControlState) ApplyControlState(item, r); else ApplyState(item, r);
         }

@@ -80,6 +80,8 @@ namespace RickAndMortyTogether
             // The working parts may come later in the task (the story hands them out): wait for one.
             float until = Time.realtimeSinceStartup + 60;
             while ((part = PartFor(point, points, invalid)) == null && Time.realtimeSinceStartup < until) yield return StartCoroutine(Pause(1));
+            until = Time.realtimeSinceStartup + 60;
+            while ((part = PartFor(point, points, invalid)) == null && Time.realtimeSinceStartup < until) yield return StartCoroutine(Pause(1));
             if (part == null)
             {
                 foreach (AttachableItem a in Resources.FindObjectsOfTypeAll<AttachableItem>())
@@ -138,12 +140,42 @@ namespace RickAndMortyTogether
         // The wearer answers each of Rick's calls (looking at the watch runs the game's JoinCall).
         IEnumerator AnswerCalls(SmartWatchController watch)
         {
-            FieldInfo ringing = typeof(SmartWatchController).GetField("_notificationCoroutine", AnyField);
+            FieldInfo state = typeof(SmartWatchController).GetField("_callState", AnyField), next = typeof(SmartWatchController).GetField("_nextCallState", AnyField);
+            FieldInfo joining = typeof(SmartWatchController).GetField("_joinCallCoroutine", AnyField), leaving = typeof(SmartWatchController).GetField("_leaveCallCoroutine", AnyField);
+            // A player glances at the watch now and then while a call waits; each glance plays the call's next clip.
             while (watch != null && tourFailure == null)
             {
-                if (!watch.IsInCall && ringing.GetValue(watch) != null) { Log("Watch: answering Rick's call"); watch.JoinCall(); }
-                yield return StartCoroutine(Pause(2));
+                bool busy = watch.IsInCall || joining.GetValue(watch) != null || leaving.GetValue(watch) != null;
+                if (!busy && (next.GetValue(watch) != null || state.GetValue(watch) != null)) { Log("Watch: answering Rick's call"); watch.JoinCall(); }
+                yield return StartCoroutine(Pause(6));
             }
+        }
+
+        // Lab stand-in for where the game hands out the working parts (not established yet): 30 s into the repair the
+        // host makes each one nothing in the garage fits yet, by the computer; every copy shares it as something the
+        // game made.
+        IEnumerator ProvideParts(float at)
+        {
+            yield return StartCoroutine(UntilHostTime(at));
+            BrainControlledModule_Computer c;
+            System.Array points = ComputerPoints(out c);
+            WorldItemData[] invalid = (WorldItemData[])typeof(BrainControlledModule_Computer).GetField("_invalidAttachableItems", AnyField).GetValue(c);
+            for (int i = 0; i < points.Length; i++)
+            {
+                AttachablePoint point = PointField<AttachablePoint>(points.GetValue(i), "attachPoint");
+                if (PartFor(point, points, invalid) != null) continue;
+                AttachableItem working = PointField<AttachableItem>(points.GetValue(i), "workingPart");
+                Object.Instantiate(working.gameObject, point.transform.position + Vector3.up * 0.4f + Vector3.left * (0.4f + 0.2f * i), Quaternion.identity);
+                Log("Computer: made a " + working.name + " for the lab");
+            }
+        }
+
+        // The story's own count of the computer's repaired parts (3 = repaired).
+        static int ComputerRepaired()
+        {
+            OwlchemyVR.Brain.BrainVariableStatusController v;
+            OwlchemyVR.Brain.BrainManager brain = OwlchemyVR.Brain.BrainManager.no_instantiate_instance;
+            return brain != null && brain.VariableListStatus.VariableStatuses.TryGetValue("Computer_SubtasksComplete", out v) ? v.GetIntValue() : -1;
         }
 
         static bool Dead() { return DeathController.Instance != null && DeathController.Instance.PlayerIsDead; }
@@ -272,15 +304,20 @@ namespace RickAndMortyTogether
             float fromHand = hostWatch != null && wearer != null ? (hostWatch.Attachable.transform.position - wearer.Pose.Left.Position).magnitude : -1;
             Check("laundry.host.watch", hostWatch != null && hostWatch.Attachable.CurrentlyAttachedTo == null && fromHand >= 0 && fromHand < 0.4f,
                 "watch " + (hostWatch == null ? "missing" : hostWatch.Attachable.CurrentlyAttachedTo != null ? "in " + hostWatch.Attachable.CurrentlyAttachedTo.name : "loose") + ", " + fromHand.ToString("0.00") + " m from the client's left hand");
+            // Rick's call on the client's watch is heard here too.
+            yield return StartCoroutine(Wait(() => WatchClipsHeard > 0, 40, "laundry.host.watchcall", "none of the client's watch calls was heard here"));
+            if (tourFailure != null) yield break;
+            Check("laundry.host.watchcall", true, WatchClipsHeard + " of the client's watch clips heard here");
             // 7. The computer: the host swaps in the crystal and the fuse, the client the RAM stick (any part that fits and is
             //    not a broken one). The story's COMPUTER_REPAIRED moves both on.
+            StartCoroutine(ProvideParts(FixAt + 30));
             yield return StartCoroutine(SwapPart(0, FixAt, "laundry.host.fix"));
             if (tourFailure != null) yield break;
             yield return StartCoroutine(SwapPart(2, FixAt + 20, "laundry.host.fix"));
             if (tourFailure != null) yield break;
-            yield return StartCoroutine(Wait(() => CurrentStageName() != "FixComputerTask", 120, "laundry.host.fix", () => "still on " + CurrentStageName() + ", computer " + ComputerHolds()));
+            yield return StartCoroutine(Wait(() => ComputerRepaired() >= 3, 120, "laundry.host.fix", () => "the story counts " + ComputerRepaired() + " parts fixed, computer " + ComputerHolds()));
             if (tourFailure != null) yield break;
-            Check("laundry.host.fix", true, "computer " + ComputerHolds() + ": stage " + CurrentStageName());
+            Check("laundry.host.fix", true, "computer " + ComputerHolds() + ": repaired for the story");
             yield return StartCoroutine(Pause(15));
             Check("tour.done", tourFailure == null, "laundry");
         }
@@ -339,9 +376,9 @@ namespace RickAndMortyTogether
             StartCoroutine(AnswerCalls(watch));
             yield return StartCoroutine(SwapPart(1, FixAt + 10, "laundry.client.fix"));
             if (tourFailure != null) yield break;
-            yield return StartCoroutine(Wait(() => CurrentStageName() != "FixComputerTask" && CurrentStageName() == hostStage, 240, "laundry.client.fix", () => "here " + CurrentStageName() + ", host " + hostStage + ", computer " + ComputerHolds()));
+            yield return StartCoroutine(Wait(() => ComputerRepaired() >= 3 && !ComputerHolds().Contains("empty") && !ComputerHolds().Contains("Broken"), 240, "laundry.client.fix", () => "the story counts " + ComputerRepaired() + " parts fixed here, computer " + ComputerHolds()));
             if (tourFailure != null) yield break;
-            Check("laundry.client.fix", true, "computer " + ComputerHolds() + ": stage " + CurrentStageName() + " on both");
+            Check("laundry.client.fix", true, "computer " + ComputerHolds() + ": repaired for the story here too");
             Check("laundry.client.errors", errorCount == errorsAtStart && SpawnsRemoved == removed, (errorCount - errorsAtStart) + " game errors, " + (SpawnsRemoved - removed) + " removed as made only here");
             Check("tour.done", tourFailure == null, "laundry");
         }

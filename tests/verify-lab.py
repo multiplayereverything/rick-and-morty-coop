@@ -25,10 +25,9 @@ LABS = {"host": "lab-host", "c1": "lab-c1", "c2": "lab-c2", "c3": "lab-c3"}
 METRIC = re.compile(r"RT-METRIC (.*)")
 CHECK = re.compile(r"RT-CHECK (\S+) (PASS|FAIL) ?(.*)")
 STATE = re.compile(r"RT-STATE (.*)")
-MIDJOIN = re.compile(r"Joining (\S+) mid-scene")
 FX = re.compile(r"RT-FX ht=(\S+) scene=(\S+) fx=(\S+)")
 NPC_MODULES = ("BrainControlledModule_Voice.", "BrainControlledModule_Animation.", "BrainControlledModule_RickCinematicEvent.", "BrainControlledModule_InterruptAllCharacters.")
-FX_WINDOW = 3.0
+FX_WINDOW = 5.0   # a line waits on its character's animation, whose start timing varies a few seconds between copies
 DEATH_TRAIL = 60.0    # after a copy's own respawn its story's timed lines trail the others' until the next shared event
 SCENE_SETTLE = 12.0   # a copy that just loaded a scene runs that scene's opening effects itself; compare after that
 REST_LIMIT, MOVING_LIMIT = 0.05, 0.5
@@ -41,10 +40,6 @@ MODMS_BUDGET, HEAP_SLOPE_BUDGET, ERROR_SLOPE_BUDGET = 2.0, 1.5, 0.5
 def parse(path):
     metrics, checks, moderrors, states, fx = [], [], [], [], []
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        j = MIDJOIN.search(line)
-        if j:
-            fx.append((-1.0, j.group(1), "MIDJOIN"))
-            continue
         f = FX.search(line)
         if f:
             if any(m in f.group(3) for m in NPC_MODULES):
@@ -232,19 +227,12 @@ def main():
         recently_dead = any(t - DEATH_TRAIL <= ht <= t + FX_WINDOW + 2 for ht in dead.get(role, []))
         return len(near) >= 3 and all(s == scene for s in near) and not recently_dead
 
-    # A copy that joined a scene mid-way runs that scene's story from its start: its timed lines trail the host's
-    # until the next shared event. Not compared there (reported instead).
-    midjoined = {(role, scene) for role, fx in effects.items() for t, scene, name in fx if name == "MIDJOIN"}
-    if midjoined:
-        npc["midjoin"] = sorted(f"{r} in {s}" for r, s in midjoined)
     for a in effects:
         for b in effects:
             if a == b:
                 continue
             pool = list(effects[b])
             for t, scene, name in effects[a]:
-                if name == "MIDJOIN" or (a, scene) in midjoined or (b, scene) in midjoined:
-                    continue
                 if not (in_scene(a, t, scene) and in_scene(b, t, scene)):
                     continue
                 match = next((x for x in pool if x[2] == name and abs(x[0] - t) <= FX_WINDOW), None)

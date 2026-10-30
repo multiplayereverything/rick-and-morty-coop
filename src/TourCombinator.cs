@@ -98,7 +98,7 @@ namespace RickAndMortyTogether
             if (!CombinablePair(c, out a, out b)) { Check("combinator.client.pads", false, "no synced pair here combines"); yield break; }
             ItemCollectionZone leftZone = CombinatorField<ItemCollectionZone>(c, "collectionZoneLeft"), rightZone = CombinatorField<ItemCollectionZone>(c, "collectionZoneRight");
             // The host's copies land on its pads: this copy's followers must land on this copy's pads.
-            yield return StartCoroutine(Wait(() => OnPad(leftZone, a) && OnPad(rightZone, b), CombineAt - 2 - HostTime, "combinator.client.pads", () => a.Grab.name + " on the left pad " + OnPad(leftZone, a) + ", " + b.Grab.name + " on the right " + OnPad(rightZone, b)));
+            yield return StartCoroutine(Wait(() => OnPad(leftZone, a) && OnPad(rightZone, b), CombineAt - 2 - HostTime, "combinator.client.pads", () => a.Grab.name + " on the left pad " + OnPad(leftZone, a) + " at " + V(a.Grab.transform.position) + " (pad " + V(PadSpot(leftZone)) + ", id " + a.Id.ToString("x8") + ", following " + a.Following + ", target " + (a.HasTarget ? V(a.TargetPosition) : "none") + ", kinematic " + (a.Body != null && a.Body.isKinematic) + "), " + b.Grab.name + " on the right " + OnPad(rightZone, b) + " at " + V(b.Grab.transform.position) + " (id " + b.Id.ToString("x8") + ", target " + (b.HasTarget ? V(b.TargetPosition) : "none") + ")"));
             if (tourFailure != null) yield break;
             Check("combinator.client.pads", true, a.Grab.name + " + " + b.Grab.name + " on this copy's pads");
             int errorsAtStart = errorCount, adopted = SpawnsAdopted, copied = SpawnsCopied, removed = SpawnsRemoved;

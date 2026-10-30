@@ -147,6 +147,12 @@ namespace RickAndMortyTogether
             items[h.Id] = item; itemOf[grab] = item;
             StartFollowing(item);
             item.TargetPosition = h.Position; item.TargetRotation = h.Rotation; item.HasTarget = true;
+            byte[] early;
+            if (earlyStates.TryGetValue(h.Id, out early))
+            {
+                earlyStates.Remove(h.Id);
+                using (BinaryReader r = new BinaryReader(new MemoryStream(early))) ClientState(r, Op.ItemState);
+            }
             return item;
         }
 

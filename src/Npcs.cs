@@ -63,57 +63,7 @@ namespace RickAndMortyTogether
             }
         }
 
-        // A player who joins a scene the host has been in a while starts that scene's story from its beginning: its
-        // opening lines would play for them alone. For the first 15 s of that story here (it starts when the scene's
-        // areas have come up, which on a slow machine is a minute after the load), voiced lines complete without playing.
-        const float OpeningMute = 15f;
-        float hostSceneSince, muteOpeningsUntil = -1, arrivedAt = -1;
-        public int MutedOpenings;   // lab checks read it
-
-        // age: how long the host has been in that scene (seconds), or -1 when the message doesn't say.
-        public void SetHostScene(string scene, float age)
-        {
-            if (age >= 0) hostSceneSince = Time.realtimeSinceStartup - age;
-            else if (scene != HostScene) hostSceneSince = Time.realtimeSinceStartup;
-            HostScene = scene;
-        }
-
-        // Host: seconds since its active scene last changed (0 while it is loading another).
-        string ageScene = "";
-        float ageSince;
-        public float HostSceneAge()
-        {
-            string active = SceneManager.GetActiveScene().name;
-            if (active != ageScene) { ageScene = active; ageSince = Time.realtimeSinceStartup; }
-            return HostSceneNow() == active ? Time.realtimeSinceStartup - ageSince : 0f;
-        }
-
-        // A load into a scene the host has been in a while: lines are held from the start of the load until 15 s after
-        // the new scene's first line here, or 2 minutes after arriving if none comes.
-        void FollowStarting()
-        {
-            if (Time.realtimeSinceStartup - hostSceneSince < OpeningMute || Mutant("noopeningmute")) return;
-            muteOpeningsUntil = float.MaxValue; arrivedAt = -1;
-            Log("Joining " + HostScene + " mid-scene (the host has been there " + (Time.realtimeSinceStartup - hostSceneSince).ToString("0") + " s): its opening lines are skipped");
-        }
-
-        void ArrivedInHostScene()
-        {
-            if (muteOpeningsUntil == float.MaxValue) arrivedAt = Time.realtimeSinceStartup;
-        }
-
-        public bool MuteOpening(BrainEffectInstance effect)
-        {
-            float now = Time.realtimeSinceStartup;
-            if (muteOpeningsUntil < now || effect == null || effect.Effect == null) return false;
-            string fx = effect.Effect.ClassName + "." + effect.Effect.FunctionToCall;
-            if (!(fx.Contains("BrainControlledModule_Voice.") || fx.Contains("WithVoice"))) return false;
-            // The new scene's first line here starts the 15 s (or, 2 minutes after arriving with none, the hold ends).
-            if (muteOpeningsUntil == float.MaxValue && arrivedAt >= 0) muteOpeningsUntil = now - arrivedAt > 120f ? -1 : now + OpeningMute;
-            if (now >= muteOpeningsUntil) return false;
-            MutedOpenings++;
-            return true;
-        }
+        public void SetHostScene(string scene) { HostScene = scene; }
 
         // Lab: every Brain effect that runs here, so the verifier can compare dialogue and animation across copies.
         public void OnEffect(BrainEffectInstance effect)
@@ -166,21 +116,6 @@ namespace RickAndMortyTogether
     [HarmonyPatch(typeof(BrainManager), "ExecuteEffectWithContext")]
     static class EffectLogPatch
     {
-        static readonly System.Reflection.MethodInfo complete = typeof(BrainControlledModule).GetMethod("Complete", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);   // process-scoped (reflection handle)
-
-        static bool Prefix(BrainEffectInstance effect, BrainInstanceStatusController instanceStatus)
-        {
-            TogetherRuntime rt = TogetherRuntime.Instance;
-            if (rt == null) return true;
-            if (rt.MuteOpening(effect))
-            {
-                // Done without being played: the module's own completion, so the story moves on as if it had.
-                BrainControlledModule module = instanceStatus.ObjectInstance.RegisteredModuleEvents[effect.Effect.ClassName];
-                complete.Invoke(module, new object[] { effect });
-                return false;
-            }
-            rt.OnEffect(effect);
-            return true;
-        }
+        static void Prefix(BrainEffectInstance effect) { if (TogetherRuntime.Instance != null) TogetherRuntime.Instance.OnEffect(effect); }
     }
 }
