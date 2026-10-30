@@ -35,7 +35,9 @@ $tours = @{
         'play.client.EggShootOut@c1', 'play.client.Bathroom@c1', 'play.client.PetriDish@c1', 'play.client.Troy@c1', 'play.client.Satellite@c1', 'play.client.home@c1', 'tour.done') }
     'boss' = @{ Seconds = 800; Expect = @('boss.host.on@host', 'boss.host.states@host', 'boss.client.states@c1', 'boss.client.held@c1', 'tour.done') }
     'latejoin' = @{ Seconds = 800; ClientArgs = '-rt-join-after 60'; Expect = @('latejoin.host.look@host', 'latejoin.client.muted@c1', 'latejoin.client.look@c1', 'tour.done') }
-    'garage' = @{ Seconds = 400; Expect = @('garage.host.start@host', 'garage.client.start@c1', 'garage.host.loose@host', 'garage.host.repaired@host', 'garage.client.loose@c1', 'garage.client.repaired@c1', 'garage.client.laundry@c1', 'garage.client.errors@c1', 'tour.done') }
+    'garage' = @{ Seconds = 400; Expect = @('garage.host.start@host', 'garage.client.start@c1', 'garage.host.loose@host', 'garage.host.repaired@host', 'garage.client.loose@c1', 'garage.client.repaired@c1', 'garage.host.attach@host', 'garage.client.attach@c1', 'garage.client.detach@c1', 'garage.host.detached@host', 'garage.client.laundry@c1', 'garage.client.errors@c1', 'tour.done') }
+    'combinator' = @{ Seconds = 400; Expect = @('combinator.host.found@host', 'combinator.client.pads@c1', 'combinator.host.result@host', 'combinator.client.result@c1', 'combinator.client.single@c1', 'combinator.client.errors@c1', 'tour.done') }
+    'laundry' = @{ Seconds = 500; Expect = @('laundry.host.out@host', 'laundry.client.in@c1', 'laundry.host.washed@host', 'laundry.client.washed@c1', 'laundry.client.stage@c1', 'laundry.client.errors@c1', 'tour.done') }
     'spawns' = @{ Seconds = 200; Expect = @(
         'spawns.host.announced@host', 'spawns.host.despawned@host', 'spawns.host.one@host',
         'spawns.client.copied@c1', 'spawns.client.adopted@c1', 'spawns.client.removed@c1', 'spawns.client.despawned@c1', 'spawns.client.late@c1', 'tour.done') }

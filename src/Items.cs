@@ -30,6 +30,12 @@ namespace RickAndMortyTogether
         public byte TargetLock, LastLock;
         public bool HasControlTarget, QuietControl;
         public bool Spawned;           // made by the game while playing (Spawns.cs), id given by the host
+        // A part that goes into attach points (Attach.cs): its rigidbody is removed while it is in one.
+        public AttachableItem Part;
+        public bool AttachDirty;       // owner: attached or detached here since the last state sent
+        public bool Confirmed = true;  // owner: the host has granted this copy's claim, so its states are accepted
+        public bool PointPart;         // made by the game in an attach point on every copy: id from the point (Attach.cs)
+        public bool WasInPoint;        // in an attach point when last looked at
     }
 
     // Host-authoritative item ownership. The host starts as owner of every item. Grabbing an item claims it; the
@@ -95,10 +101,13 @@ namespace RickAndMortyTogether
                 if (grab == null || itemOf.ContainsKey(grab) || passedOver.Contains(grab)) continue;
                 // A part the game made and attached (the computer's RAM stick, crystal, fuse) is made and attached by the game on
                 // every copy, but whether its rigidbody is on at this moment differs: look again once it is loose.
-                if (IsSpawned(grab.transform) && AttachedPart(grab) && !Mutant("noattachwait")) continue;
+                // Each copy's game made it there, so it gets its id from the point instead of a host announcement.
+                if (IsSpawned(grab.transform) && AttachedPart(grab) && !Mutant("noattachwait")) { if (!Mutant("noattachsync")) RegisterPointPart(grab); continue; }
                 Rigidbody body = grab.GetComponent<Rigidbody>();
                 LimitedIndirectGrabbableController control = grab.GetComponent<LimitedIndirectGrabbableController>();
-                if (body == null && control == null) { passedOver.Add(grab); continue; }
+                AttachableItem part = grab.GetComponent<AttachableItem>();
+                // A part in an attach point has no rigidbody until it comes out; it is still synced.
+                if (body == null && control == null && (part == null || Mutant("noattachsync"))) { passedOver.Add(grab); continue; }
                 // Each player's own spectator camera is theirs (it travels in their pose, see Spectator.cs).
                 if (grab.GetComponentInParent<SpectatorCameraController>() != null) { passedOver.Add(grab); continue; }
                 if (IsSpawned(grab.transform)) { FoundSpawned(grab, body, control); continue; }
@@ -106,7 +115,7 @@ namespace RickAndMortyTogether
                 if (control != null && PerPlayerControl(key)) { passedOver.Add(grab); continue; }
                 uint id = Hash(key);
                 if (items.ContainsKey(id)) { passedOver.Add(grab); continue; }   // a duplicate path (an unnamed runtime clone) stays local
-                NetItem item = new NetItem { Id = id, Key = key, Grab = grab, Body = body, Control = control, Owner = 0, OriginalKinematic = body != null && body.isKinematic };
+                NetItem item = new NetItem { Id = id, Key = key, Grab = grab, Body = body, Control = control, Part = part, Owner = 0, OriginalKinematic = body != null && body.isKinematic };
                 items[id] = item; itemOf[grab] = item;
                 added++;
                 // On a client every item starts as a follower of the host's copy, so local bumps cannot drift it.
@@ -162,7 +171,7 @@ namespace RickAndMortyTogether
             if (!itemOf.TryGetValue(grab, out item)) return;
             if (Hosting) { GrantItem(item, 0); return; }
             // Optimistic: simulate it at once so the hand carries it; the host's answer confirms or hands it on.
-            item.Owner = LocalId;
+            item.Owner = LocalId; item.Confirmed = false;
             StopFollowing(item, true);
             item.SentRest = false;
             if (!Mutant("noclaim")) Send(0, Wire.Packet(Op.ItemClaim, w => { w.Write(item.Id); w.Write(item.Epoch); }));
@@ -213,7 +222,7 @@ namespace RickAndMortyTogether
             NetItem item;
             if (!items.TryGetValue(id, out item)) return;
             item.Epoch = epoch; item.Owner = owner;
-            if (owner == LocalId) StopFollowing(item);
+            if (owner == LocalId) { item.Confirmed = true; StopFollowing(item); }
             else { ReleaseLocalHold(item); StartFollowing(item); }
         }
 
@@ -226,7 +235,7 @@ namespace RickAndMortyTogether
                 NetItem it = item;
                 if (it.Grab == null) continue;
                 Send(to, Wire.Packet(Op.ItemOwner, w => { w.Write(it.Id); w.Write(it.Epoch); w.Write((byte)it.Owner); }));
-                if (it.Owner == 0 && (it.Body != null || it.Control != null)) Send(to, StatePacket(it, true));
+                if (it.Owner == 0 && (it.Body != null || it.Control != null || it.Part != null)) Send(to, StatePacket(it, true));
             }
         }
 
@@ -239,9 +248,10 @@ namespace RickAndMortyTogether
         byte[] StatePacket(NetItem item, bool rest)
         {
             if (item.Control != null) return ControlStatePacket(item, rest);
-            Transform t = item.Body.transform;
-            Vector3 velocity = item.Body.isKinematic ? Vector3.zero : item.Body.velocity;
-            return Wire.Packet(Op.ItemState, w => { w.Write(item.Id); w.Write(item.Epoch); w.Write(rest); Wire.Vec(w, t.position); Wire.Rot(w, t.rotation); Wire.Vec(w, velocity); });
+            Transform t = item.Grab.transform;
+            Vector3 velocity = item.Body == null || item.Body.isKinematic ? Vector3.zero : item.Body.velocity;
+            string point = AttachKeyOf(item);
+            return Wire.Packet(Op.ItemState, w => { w.Write(item.Id); w.Write(item.Epoch); w.Write(rest); Wire.Vec(w, t.position); Wire.Rot(w, t.rotation); Wire.Vec(w, velocity); Wire.Text(w, point); });
         }
 
         void HostItemState(int from, BinaryReader r) { HostState(from, r, Op.ItemState); }
@@ -276,7 +286,10 @@ namespace RickAndMortyTogether
             r.ReadUInt32(); r.ReadUInt16();
             bool rest = r.ReadBoolean();
             Vector3 position = Wire.Vec(r); Quaternion rotation = Wire.Rot(r); Wire.Vec(r);
-            if (item.Owner == LocalId || item.Body == null) return;
+            string point = Wire.Text(r, 512);
+            if (item.Owner == LocalId) return;
+            ApplyAttach(item, point);
+            if (item.Body == null || InPoint(item)) return;
             if (!Mutant("nofollow")) StartFollowing(item);
             item.TargetPosition = position; item.TargetRotation = rotation; item.HasTarget = true;
             if (rest) { item.Body.transform.position = position; item.Body.transform.rotation = rotation; }
@@ -293,10 +306,13 @@ namespace RickAndMortyTogether
             {
                 if (item.Grab == null) continue;
                 if (item.Control != null) { ControlUpdate(item, now, k); continue; }
+                if (item.Part != null) { RefreshBody(item); item.WasInPoint = InPoint(item); }
+                // Owner: one state as soon as it went into or out of an attach point (an attached part streams nothing).
+                if (item.AttachDirty && item.Owner == LocalId && (Hosting || item.Confirmed)) { item.AttachDirty = false; item.LastSend = now; Broadcast(StatePacket(item, !item.Grab.IsCurrInHand), -1); }
                 if (item.Body == null) continue;
                 if (item.Owner != LocalId)
                 {
-                    if (item.Following && item.HasTarget)
+                    if (item.Following && item.HasTarget && !InPoint(item))
                     {
                         Transform t = item.Body.transform;
                         t.position = Vector3.Lerp(t.position, item.TargetPosition, k);

@@ -26,6 +26,7 @@ $mutants = [ordered]@{
     'nospawntemplate' = 'garage' # a part only the host's game made never appears on a client that has none out
     'nolaundryunparent' = 'garage' # the laundry zone's game error (deprecated LevelController) on a client
     'noattachwait' = 'garage' # a client registers its own attached computer parts and removes them as made only here
+    'noattachsync' = 'garage' # a part put into or taken out of an attach point moves on that player's copy only
     'nocause'   = 'story'     # story events are neither sent by the host nor held back on clients
     'nospectatorview' = 'spectator'  # cycling spectator cameras never visits the other players' views
     'noinertorder' = 'spectator'  # copying the spectator camera leaves game scripts on it (removed in an order Unity refuses)
@@ -43,6 +44,7 @@ foreach ($m in $mutants.Keys) {
     $results += [pscustomobject]@{ Mutant = $m; Tour = $tour; Caught = [bool]$caught; FirstFailure = ("$first").Trim() }
     Write-Output ("{0} ({1}): {2}  {3}" -f $m, $tour, $(if ($caught) { 'CAUGHT' } else { 'MISSED' }), ("$first").Trim())
 }
+if ($Only.Count -gt 0 -and @($results).Count -lt $Only.Count) { Write-Output ('MUTANTS: unknown name in ' + ($Only -join ', ')); exit 1 }
 $results | ConvertTo-Json | Set-Content (Join-Path $modRoot 'artifacts/tests/mutants/summary.json')
 if (@($results | Where-Object { -not $_.Caught }).Count -gt 0) { Write-Output 'MUTANTS: some fixes are not covered'; exit 1 }
 Write-Output 'MUTANTS: every fix is caught by its tour'

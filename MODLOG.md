@@ -2,6 +2,40 @@
 
 Newest first. Each entry: what changed, why, and how it was tested. Decisions made without asking are marked **Decision**.
 
+## 0.8.0 (2026-10-30, protocol 8)
+
+Parts in sockets are shared, and the combinator and the laundry task are checked with two players.
+
+- **Attach points:** putting a part into a socket (the computer's RAM stick, crystal and fuse, or any `AttachablePoint`)
+  or taking it out now happens on every copy. The owner's item state carries the point the part is in (its scene path,
+  "" for none, `Op.ItemState`, protocol 8); other copies run the game's own `AttachTo` / `Detach`, so its listeners (the
+  computer module, the story's ATTACHED_TO / DETACHED_FROM events, echoed once through the host) react everywhere. A
+  Harmony postfix on `AttachTo` and `Detach` sends one state as soon as the owner's part goes in or out (an attached
+  part has no rigidbody, so it streams nothing). A copy that still has something else in that point takes it out
+  first: the game's points hold one part. Mutant `noattachsync`.
+- **Parts the game made in a point** (the computer's broken and working parts, refills): every copy's game makes the
+  same one there, so it gets its id from the point and its name instead of a host announcement. When the game
+  replaces it (the repair), each copy's replacement takes the same id, and the old one's removal is not sent to
+  other copies (that would remove their replacement).
+- **Lab:** the `garage` tour now swaps the computer's RAM stick for the loose one on the host (the client must show
+  the same, by point) and then takes it out on the client (the host must show that). New tours `combinator` (two
+  synced items on the pads, Go pushed by the host's hand: the client's copies land on its pads and it adopts the
+  host's result) and `laundry` (stage LaundryTask: Rick's dumped laundry into the washer, door closed, button pushed:
+  the same pieces wet on both, the same stage). `mutants.ps1 -Only` fails on a name it does not know.
+- **Tested** (`artifacts/tests/`):
+  - `garage`: PASS (host 8/8, client 9/9; point parts registered with the same ids on both, the repair's replacements
+    included). `combinator`: PASS (BeakerMedium_RAM + Mace; the client adopted the host's result, none copied or
+    removed, no errors). `laundry`: PASS (3 pieces wet on both, both on LaundryTask, no errors).
+  - Mutants `noattachsync` (client: "the part in AttachPoint_RAM is not synced") and `noattachwait` (host: the loose
+    part never came out): both caught.
+  - Full suite on the 0.8.0 build: `handoff`, `handoff -Lag 120`, `controls`, `spectator`, `flat`, `spawns`, `enemies`,
+    `death`, `boss`, `playthrough`, `latejoin`, `garage`: PASS. `handoff -Steam` failed once (the carried item 1.19 m
+    from the grab point, the PC starved) and passed on the rerun; `full -Players 3`: PASS.
+  - **Fix (lab):** `story.client.areas` failed now and then: the garage's story switches the `Death` area on and off
+    as it loads, on each copy at its own pace, and the check counted it although `Death` is each player's own (never
+    synced). The check now leaves each player's own areas out, as the sync does. Then `story` passed 3 of 3, and
+    mutant `noarea` is still caught.
+
 ## 0.7.1 (2026-10-29, protocol 7)
 
 The garage's own spawners checked in the lab: the computer's parts, made by the game's

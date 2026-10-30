@@ -120,7 +120,8 @@ namespace RickAndMortyTogether
             if (tourFailure != null) yield break;
             Check("story.client.garage", true, "followed the host into the garage");
             // The host switches on a second area after arriving; wait for it, then for the same set here.
-            yield return StartCoroutine(Wait(() => { List<string> mineOn = ActiveAreas(); if (hostAreas.Count < 2 || mineOn.Count != hostAreas.Count) return false; foreach (string a in hostAreas) if (!mineOn.Contains(a)) return false; return true; }, 60, "story.client.areas", () => "areas here " + string.Join(",", ActiveAreas().ToArray()) + ", host " + string.Join(",", hostAreas.ToArray())));
+            // Each player's own areas (Death, which the garage's story switches on and off as it loads) are not compared.
+            yield return StartCoroutine(Wait(() => { List<string> mineOn = ActiveAreas(); mineOn.RemoveAll(PerPlayerArea); if (hostAreas.Count < 2 || mineOn.Count != hostAreas.Count) return false; foreach (string a in hostAreas) if (!mineOn.Contains(a)) return false; return true; }, 60, "story.client.areas", () => "areas here " + string.Join(",", ActiveAreas().ToArray()) + ", host " + string.Join(",", hostAreas.ToArray())));
             if (tourFailure != null) yield break;
             Check("story.client.areas", true, "areas on: " + string.Join(",", ActiveAreas().ToArray()));
             // 5. Try to go back to the living room alone: held back while the host stays.

@@ -46,7 +46,7 @@ namespace RickAndMortyTogether
             {
                 string scene = SceneManager.GetActiveScene().name;
                 uint id = Hash("spawn:" + scene + ":" + (++spawnCounter));
-                NetItem item = new NetItem { Id = id, Key = "spawn:" + BaseName(grab.name), Grab = grab, Body = body, Control = control, Owner = 0, OriginalKinematic = body != null && body.isKinematic, Spawned = true };
+                NetItem item = new NetItem { Id = id, Key = "spawn:" + BaseName(grab.name), Grab = grab, Body = body, Control = control, Part = grab.GetComponent<AttachableItem>(), Owner = 0, OriginalKinematic = body != null && body.isKinematic, Spawned = true };
                 items[id] = item; itemOf[grab] = item;
                 if (Active) { SpawnsAnnounced++; LastSpawnAnnounce = HostTime; Broadcast(SpawnPacket(item), -1); Log("Spawn " + grab.name + " -> " + id.ToString("x8")); }
                 return;
@@ -143,7 +143,7 @@ namespace RickAndMortyTogether
         {
             if (grab == null) return null;
             Rigidbody body = grab.GetComponent<Rigidbody>();
-            NetItem item = new NetItem { Id = h.Id, Key = "spawn:" + h.Name, Grab = grab, Body = body, Control = grab.GetComponent<LimitedIndirectGrabbableController>(), Owner = 0, OriginalKinematic = body != null && body.isKinematic, Spawned = true };
+            NetItem item = new NetItem { Id = h.Id, Key = "spawn:" + h.Name, Grab = grab, Body = body, Control = grab.GetComponent<LimitedIndirectGrabbableController>(), Part = grab.GetComponent<AttachableItem>(), Owner = 0, OriginalKinematic = body != null && body.isKinematic, Spawned = true };
             items[h.Id] = item; itemOf[grab] = item;
             StartFollowing(item);
             item.TargetPosition = h.Position; item.TargetRotation = h.Rotation; item.HasTarget = true;
@@ -161,6 +161,9 @@ namespace RickAndMortyTogether
                 items.Remove(item.Id);
                 if (item.Control != null) FollowingControls.Remove(item.Control);
                 if (!Active || Mutant("nodespawn")) continue;
+                // A part the game destroyed while it sat in a point (the computer swapping broken parts for working
+                // ones) is replaced by each copy's own game under the same id: removing it elsewhere would remove that.
+                if (item.PointPart && item.WasInPoint) continue;
                 uint id = item.Id;
                 byte[] packet = Wire.Packet(Op.Despawn, w => w.Write(id));
                 if (Hosting) { Broadcast(packet, -1); Despawns++; Log("Despawn " + item.Key); }

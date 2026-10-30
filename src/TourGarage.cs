@@ -13,13 +13,36 @@ namespace RickAndMortyTogether
     //    has none out, must still get one.
     // 2. Both copies repair the computer (what the shared story does on each), the client 4 s after the host (a slower
     //    machine): each keeps its own attached parts; the mod copies and removes none of them.
-    // 3. On the client, an item leaves the laundry zone while still its child (what a client's copy following the host's
+    // 3. The host pulls the working RAM stick out of the computer and puts the loose one in; the client must show the
+    //    same (the part the game made there is known on both by its point). Then the client takes the loose one back out,
+    //    and the host must show that.
+    // 4. On the client, an item leaves the laundry zone while still its child (what a client's copy following the host's
     //    dumped laundry does when its own Rick dumps later): the game's handler must not throw.
     public sealed partial class TogetherRuntime
     {
         const BindingFlags AnyField = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
         const float RepairAt = 170;   // host time of the shared repair: after both copies are in and the copied part is here
         static readonly Vector3 LoosePart = new Vector3(0.6f, 1.0f, -0.6f);   // process-scoped (a constant)
+        const float SwapAt = 200, PullAt = 225;   // host times of the host's swap and the client's pull (step 3)
+
+        static AttachablePoint RamPoint() { BrainControlledModule_Computer c; System.Array p = ComputerPoints(out c); return p != null ? PointField<AttachablePoint>(p.GetValue(1), "attachPoint") : null; }
+
+        GrabbableItem SyncedLoose(string name)
+        {
+            foreach (GrabbableItem g in Object.FindObjectsOfType<GrabbableItem>())
+                if (BaseName(g.name) == name && !AttachedPart(g) && (g.transform.position - LoosePart).magnitude < 1f && ItemIdOf(g) != 0) return g;
+            return null;
+        }
+
+        static string Where(NetItem item) { return item == null ? "unknown" : item.Part != null && item.Part.CurrentlyAttachedTo != null ? item.Part.CurrentlyAttachedTo.name : "out"; }
+
+        // What a hand's grab does for an item here, without a hand (an attached part has no body to grab in the lab).
+        void ClaimForTour(NetItem item)
+        {
+            item.Owner = LocalId; item.Confirmed = false;
+            StopFollowing(item, true);
+            Send(0, Wire.Packet(Op.ItemClaim, w => { w.Write(item.Id); w.Write(item.Epoch); }));
+        }
 
         static System.Array ComputerPoints(out BrainControlledModule_Computer computer)
         {
@@ -90,8 +113,8 @@ namespace RickAndMortyTogether
             ItemCollectionZone zone = (ItemCollectionZone)typeof(UnpartentOnExitItemCollectionZone).GetField("itemCollectionZone", AnyField).GetValue(unparent);
             PickupableItem item = null;
             foreach (PickupableItem p in Object.FindObjectsOfType<PickupableItem>())
-                if (p.GetComponent<Rigidbody>() != null && !p.IsCurrInHand && ItemIdOf(p) == 0) { item = p; break; }
-            if (item == null) { laundryResult = "no unsynced item to move"; return false; }
+                if (p.GetComponent<Rigidbody>() != null && !p.IsCurrInHand && (item == null || ItemIdOf(item) != 0)) item = p;   // an unsynced one if any
+            if (item == null) { laundryResult = "no loose item to move"; return false; }
             Transform before = item.transform.parent;
             Rigidbody body = item.GetComponent<Rigidbody>();
             BindingFlags any = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -135,7 +158,23 @@ namespace RickAndMortyTogether
             int holding;
             string hold = PointsHold(ComputerPoints(out computer), out holding);
             Check("garage.host.repaired", holding == points.Length, hold);
-            yield return StartCoroutine(Pause(15));
+            // 3. Swap the RAM stick in the computer for the loose one.
+            yield return StartCoroutine(UntilHostTime(SwapAt));
+            AttachablePoint point = RamPoint();
+            AttachableItem was = point.AttachedItems.Count > 0 ? point.AttachedItems[0] : null;
+            GrabbableItem looseGrab = SyncedLoose(BaseName(ram.name));
+            if (was == null || looseGrab == null) { Check("garage.host.attach", false, (was == null ? "nothing in " + point.name : "") + (looseGrab == null ? " no synced loose " + ram.name : "")); yield break; }
+            NetItem wasItem = ItemById(ItemIdOf(was.GetComponent<GrabbableItem>())), looseItem = ItemById(ItemIdOf(looseGrab));
+            was.Detach();
+            yield return StartCoroutine(Pause(1));
+            looseItem.Part.AttachTo(point);
+            yield return StartCoroutine(Pause(3));
+            Check("garage.host.attach", wasItem != null && Where(wasItem) == "out" && Where(looseItem) == point.name,
+                "the game's part (id " + (wasItem != null ? wasItem.Id.ToString("x8") : "none") + ") " + Where(wasItem) + ", the loose one (" + looseItem.Id.ToString("x8") + ") in " + Where(looseItem));
+            yield return StartCoroutine(Wait(() => Where(looseItem) == "out", PullAt + 25 - HostTime, "garage.host.detached", () => "the loose part is still in " + Where(looseItem) + ", owner " + looseItem.Owner));
+            if (tourFailure != null) yield break;
+            Check("garage.host.detached", true, "the client took it out; owner " + looseItem.Owner);
+            yield return StartCoroutine(Pause(5));
             Check("tour.done", tourFailure == null, "garage");
         }
 
@@ -168,6 +207,22 @@ namespace RickAndMortyTogether
             int holding;
             string hold = PointsHold(ComputerPoints(out computer), out holding);
             Check("garage.client.repaired", holding == points.Length && SpawnsRemoved == removedAtStart && SpawnsCopied == copiedAtStart, hold + ", copied by the mod " + (SpawnsCopied - copiedAtStart) + ", removed " + (SpawnsRemoved - removedAtStart));
+            // 3. The host's swap shows here; then this player takes the loose one out.
+            AttachablePoint point = RamPoint();
+            AttachableItem was = point.AttachedItems.Count > 0 ? point.AttachedItems[0] : null;
+            GrabbableItem looseGrab = SyncedLoose(ram);
+            NetItem wasItem = was != null ? ItemById(ItemIdOf(was.GetComponent<GrabbableItem>())) : null, looseItem = looseGrab != null ? ItemById(ItemIdOf(looseGrab)) : null;
+            if (wasItem == null || looseItem == null) { Check("garage.client.attach", false, (wasItem == null ? "the part in " + point.name + " is not synced" : "") + (looseItem == null ? " no synced loose " + ram : "")); yield break; }
+            yield return StartCoroutine(Wait(() => Where(wasItem) == "out" && Where(looseItem) == point.name, SwapAt + 20 - HostTime, "garage.client.attach", () => "the game's part " + Where(wasItem) + ", the loose one " + Where(looseItem)));
+            if (tourFailure != null) yield break;
+            Check("garage.client.attach", true, "the game's part out, the loose one in " + point.name + ", as on the host");
+            yield return StartCoroutine(UntilHostTime(PullAt));
+            ClaimForTour(looseItem);
+            yield return StartCoroutine(Wait(() => looseItem.Confirmed && looseItem.Owner == LocalId, 10, "garage.client.detach", "the host never granted the claim"));
+            if (tourFailure != null) yield break;
+            looseItem.Part.Detach();
+            Check("garage.client.detach", Where(looseItem) == "out", "took the loose one out here");
+            yield return StartCoroutine(Pause(4));
             Check("garage.client.laundry", LeaveLaundryZone(), laundryResult);
             Check("garage.client.errors", errorCount == errorsAtStart, (errorCount - errorsAtStart) + " game errors since the copy");
             Check("tour.done", tourFailure == null, "garage");

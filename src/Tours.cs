@@ -27,6 +27,8 @@ namespace RickAndMortyTogether
             else if (labTour == "playthrough") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? PlayHost() : PlayClient());
             else if (labTour == "boss") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? BossHost() : BossClient());
             else if (labTour == "latejoin") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? LateHost() : LateClient());
+            else if (labTour == "combinator") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? CombinatorHost() : CombinatorClient());
+            else if (labTour == "laundry") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? LaundryHost() : LaundryClient());
             else if (labTour == "garage") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? GarageHost() : GarageClient());
             else if (labTour == "spawns") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? SpawnsHost() : SpawnsClient());
             else if (labTour == "spectator") StartCoroutine(Hosting || autoRole == "host" || autoRole == "steamhost" ? SpectatorHost() : SpectatorClient());

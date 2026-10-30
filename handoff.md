@@ -1,8 +1,12 @@
 # Handoff
 
-## State (2026-10-29, 0.7.1, protocol 7)
+## State (2026-10-30, 0.8.0, protocol 8)
 
-- Garage spawners: the computer's parts (tour `garage`); attached parts the game made stay each copy's own. The
+- Parts in sockets are shared (`src/Attach.cs`; tour `garage` steps `garage.*.attach` / `detach`, mutant
+  `noattachsync`); parts the game made in a point get their id from the point. The combinator (tour `combinator`) and
+  the laundry task (tour `laundry`) work with two players in the lab.
+
+- Garage spawners: the computer's parts (tour `garage`); a part only the host's game made is copied from its prefab. The
   client's laundry zone error is fixed (`UnparentOnExitPatch`, step `garage.client.laundry`).
 
 - Late joiners skip openings, characters look at the nearest player, flat-mode teleport works, slow-machine spawn
@@ -39,9 +43,8 @@
    `garage`, checks `garage.*.start`). Not reproduced; waiting for the user to say where each Morty was. VR-only
    differences: the room-size layout (`PlayspacePositionalOffset`) offsets a headset player from the pad, and the start
    teleport only fires if no pad is current when the new pads register.
-1. **Attachments:** putting a part into the computer (or any attach point) is not synced; a part pulled out becomes
-   synced. Watch the FixComputerTask with two players. Combinator results and the laundry (stage LaundryTask) are
-   still unchecked in the lab.
+1. **Laundry task, rest:** the lab's wash leaves the stage at LaundryTask on both copies; what the story wants next
+   (drying, the basket) is unchecked.
 2. **Mid-scene join, rest:** the joiner's timed banter trails the host's until the next shared story event; copy the
    Brain's running nodes if players notice.
 3. **Real headset check of the fade path** (the lab loads without the fade).
